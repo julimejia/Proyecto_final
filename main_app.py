@@ -374,65 +374,49 @@ class AdvancedEDA:
         
         return figs, insights
     
-    def create_bivariate_analysis(self, target_col=None):
-        """Análisis bivariado"""
+    def create_bivariate_analysis(self):
         figs = []
-        insights = []
-        
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        
-        if target_col and target_col in numeric_cols:
-            # Análisis de correlación con variable objetivo
-            correlations = self.df[numeric_cols].corr()[target_col].sort_values(ascending=False)
-            
+
+        # 1. Ventas por categoría (responde: ¿qué vende más?)
+        if 'Category' in self.df.columns and 'Total Spent' in self.df.columns:
+            category_sales = (
+                self.df.groupby('Category')['Total Spent']
+                .sum()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
+
             fig = px.bar(
-                x=correlations.index,
-                y=correlations.values,
-                title=f'Correlación con {target_col}',
-                labels={'x': 'Variable', 'y': 'Correlación'},
-                color=correlations.values,
-                color_continuous_scale='RdBu'
+                category_sales,
+                x='Category',
+                y='Total Spent',
+                title='Ingresos Totales por Categoría',
+                labels={'Total Spent': 'Ingresos Totales', 'Category': 'Categoría'},
+                text_auto='.2s'
             )
-            
-            figs.append(fig)
-            
-            # Scatter plots para top correlaciones
-            top_corrs = correlations.drop(target_col).head(3)
-            for col in top_corrs.index:
-                fig = px.scatter(
-                    self.df,
-                    x=col,
-                    y=target_col,
-                    title=f'{col} vs {target_col}',
-                    trendline='ols',
-                    opacity=0.6
-                )
-                figs.append(fig)
-        
-        # Matriz de correlación no lineal (Spearman)
-        if len(numeric_cols) > 1:
-            spearman_corr = self.df[numeric_cols].corr(method='spearman')
-            
-            fig = go.Figure(data=go.Heatmap(
-                z=spearman_corr.values,
-                x=spearman_corr.columns,
-                y=spearman_corr.index,
-                colorscale='RdBu',
-                zmid=0,
-                text=np.round(spearman_corr.values, 2),
-                texttemplate='%{text}',
-                textfont={"size": 10}
-            ))
-            
             fig.update_layout(
-                title='Matriz de Correlación Spearman (No Lineal)',
-                xaxis_title='Variables',
-                yaxis_title='Variables'
+                xaxis_tickangle=-30,
+                template='plotly_white'
             )
-            
+
             figs.append(fig)
-        
-        return figs, insights
+
+        # 2. Precio vs Cantidad (elasticidad simple)
+        if 'Price Per Unit' in self.df.columns and 'Quantity' in self.df.columns:
+            fig = px.scatter(
+                self.df,
+                x='Price Per Unit',
+                y='Quantity',
+                trendline='ols',
+                title='Relación Precio vs Cantidad',
+                labels={
+                    'Price Per Unit': 'Precio por Unidad',
+                    'Quantity': 'Cantidad Comprada'
+                }
+            )
+            figs.append(fig)
+
+        return figs
     
     def temporal_analysis(self, date_col):
         """Análisis de series temporales"""
