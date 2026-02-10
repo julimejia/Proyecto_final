@@ -636,162 +636,198 @@ def show_business_analysis_page():
 # PÁGINA: VISUALIZACIONES
 # =====================================================
 def show_visualizations_page():
-    st.markdown('<h1 class="main-header">📊 Visualizaciones</h1>', unsafe_allow_html=True)
-    
-    if st.session_state.df_clean is not None:
-        df = st.session_state.df_clean
-        
-        # Seleccionar tipo de visualización
-        viz_type = st.selectbox(
-            "Seleccionar tipo de visualización",
-            ["Distribuciones", "Comparaciones", "Relaciones", "Temporal"]
-        )
-        
-        if viz_type == "Distribuciones":
-            st.markdown('<h3 class="sub-header">📈 Distribuciones</h3>', unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if 'total_spent' in df.columns:
-                    fig = create_box_plot(df, 'total_spent', 'Distribución de Montos de Venta')
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning("No se pudo crear el gráfico de caja para total_spent")
-            
-            with col2:
-                if 'quantity' in df.columns:
-                    fig = create_box_plot(df, 'quantity', 'Distribución de Cantidades Vendidas')
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning("No se pudo crear el gráfico de caja para quantity")
-            
-            # Histograma simple
+    st.markdown('<h1 class="main-header">📊 Análisis Exploratorio (EDA)</h1>', unsafe_allow_html=True)
+
+    if st.session_state.df_clean is None:
+        st.warning("⚠️ No hay datos procesados. Sube y limpia los datos primero.")
+        return
+
+    df = st.session_state.df_clean
+
+    # =========================
+    # TABS
+    # =========================
+    tab_uni, tab_bi, tab_temp, tab_report = st.tabs(
+        ["📈 Univariado", "🔗 Bivariado", "📅 Temporal", "🧾 Reporte"]
+    )
+
+    # =========================
+    # TAB 1 — UNIVARIADO
+    # =========================
+    with tab_uni:
+        st.subheader("Distribución de Variables Clave")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
             if 'total_spent' in df.columns:
-                try:
-                    fig = px.histogram(
-                        df,
-                        x='total_spent',
-                        nbins=30,
-                        title='Distribución de Montos de Venta',
-                        labels={'total_spent': 'Monto ($)'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creando histograma: {str(e)}")
-        
-        elif viz_type == "Comparaciones":
-            st.markdown('<h3 class="sub-header">🔗 Comparaciones</h3>', unsafe_allow_html=True)
-            
-            # Comparación por categoría
-            if 'category' in df.columns and 'total_spent' in df.columns:
-                try:
-                    category_sales = df.groupby('category')['total_spent'].sum().sort_values(ascending=False).head(10)
-                    
-                    fig = px.bar(
-                        category_sales.reset_index(),
-                        x='total_spent',
-                        y='category',
-                        orientation='h',
-                        title='Top 10 Categorías por Ventas',
-                        labels={'total_spent': 'Ventas Totales', 'category': 'Categoría'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creando gráfico de categorías: {str(e)}")
-            
-            # Comparación por ubicación
-            if 'location' in df.columns and 'total_spent' in df.columns:
-                try:
-                    location_sales = df.groupby('location')['total_spent'].sum().sort_values(ascending=False)
-                    
-                    fig = px.bar(
-                        location_sales.reset_index(),
-                        x='location',
-                        y='total_spent',
-                        title='Ventas por Ubicación',
-                        labels={'location': 'Ubicación', 'total_spent': 'Ventas Totales'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creando gráfico de ubicaciones: {str(e)}")
-        
-        elif viz_type == "Relaciones":
-            st.markdown('<h3 class="sub-header">🔗 Relaciones entre Variables</h3>', unsafe_allow_html=True)
-            
-            # Mapa de calor de correlaciones
-            heatmap = create_heatmap(df, 'Correlaciones entre Variables Numéricas')
-            if heatmap:
-                st.plotly_chart(heatmap, use_container_width=True)
-            else:
-                st.info("No hay suficientes variables numéricas para crear un mapa de calor")
-            
-            # Scatter plot simple
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            if len(numeric_cols) >= 2:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    x_var = st.selectbox("Variable X", numeric_cols, index=0)
-                
-                with col2:
-                    y_var = st.selectbox("Variable Y", numeric_cols, index=1 if len(numeric_cols) > 1 else 0)
-                
-                try:
-                    fig = px.scatter(
-                        df,
-                        x=x_var,
-                        y=y_var,
-                        title=f'{x_var} vs {y_var}',
-                        trendline='ols'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creando scatter plot: {str(e)}")
-        
-        elif viz_type == "Temporal":
-            st.markdown('<h3 class="sub-header">📅 Análisis Temporal</h3>', unsafe_allow_html=True)
-            
-            if 'transaction_date' in df.columns and 'total_spent' in df.columns:
-                try:
-                    # Serie temporal diaria
-                    df_temp = df.copy()
-                    df_temp['date'] = df_temp['transaction_date'].dt.date
-                    daily_sales = df_temp.groupby('date')['total_spent'].sum().reset_index()
-                    
-                    fig = px.line(
-                        daily_sales,
-                        x='date',
-                        y='total_spent',
-                        title='Ventas Diarias',
-                        labels={'date': 'Fecha', 'total_spent': 'Ventas Totales'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creando gráfico temporal diario: {str(e)}")
-                
-                # Ventas por día de semana
-                if 'weekday' in df.columns:
-                    try:
-                        weekday_sales = df.groupby('weekday')['total_spent'].sum().reset_index()
-                        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                        weekday_sales['weekday'] = pd.Categorical(weekday_sales['weekday'], categories=day_order, ordered=True)
-                        weekday_sales = weekday_sales.sort_values('weekday')
-                        
-                        fig = px.bar(
-                            weekday_sales,
-                            x='weekday',
-                            y='total_spent',
-                            title='Ventas por Día de la Semana',
-                            labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error creando gráfico por día de semana: {str(e)}")
-    else:
-        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
+                fig = px.histogram(
+                    df,
+                    x='total_spent',
+                    nbins=30,
+                    title='Distribución del Monto de Venta',
+                    labels={'total_spent': 'Monto de Venta'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            if 'quantity' in df.columns:
+                fig = px.histogram(
+                    df,
+                    x='quantity',
+                    nbins=20,
+                    title='Distribución de Cantidades Vendidas',
+                    labels={'quantity': 'Cantidad'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+        if 'total_spent' in df.columns:
+            fig = create_box_plot(df, 'total_spent', 'Outliers en Montos de Venta')
+            st.plotly_chart(fig, use_container_width=True)
+
+    # =========================
+    # TAB 2 — BIVARIADO
+    # =========================
+    with tab_bi:
+        st.subheader("Relaciones y Comparaciones")
+
+        # -------------------------
+        # Categorías vs Ventas
+        # -------------------------
+        if {'category', 'total_spent'}.issubset(df.columns):
+            category_sales = (
+                df.groupby('category')['total_spent']
+                .sum()
+                .sort_values(ascending=False)
+                .head(10)
+                .reset_index()
+            )
+
+            fig = px.bar(
+                category_sales,
+                x='total_spent',
+                y='category',
+                orientation='h',
+                title='Top 10 Categorías por Ventas',
+                labels={'total_spent': 'Ventas Totales', 'category': 'Categoría'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # -------------------------
+        # Ubicación vs Ventas
+        # -------------------------
+        if {'location', 'total_spent'}.issubset(df.columns):
+            location_sales = (
+                df.groupby('location')['total_spent']
+                .sum()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
+
+            fig = px.bar(
+                location_sales,
+                x='location',
+                y='total_spent',
+                title='Ventas por Ubicación',
+                labels={'location': 'Ubicación', 'total_spent': 'Ventas Totales'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # -------------------------
+        # Scatter interactivo
+        # -------------------------
+        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+        if len(numeric_cols) >= 2:
+            col1, col2 = st.columns(2)
+            x_var = col1.selectbox("Variable X", numeric_cols)
+            y_var = col2.selectbox("Variable Y", numeric_cols, index=1)
+
+            fig = px.scatter(
+                df,
+                x=x_var,
+                y=y_var,
+                trendline='ols',
+                title=f'Relación entre {x_var} y {y_var}'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # -------------------------
+        # Correlaciones
+        # -------------------------
+        heatmap = create_heatmap(df, 'Correlaciones entre Variables Numéricas')
+        if heatmap:
+            st.plotly_chart(heatmap, use_container_width=True)
+
+    # =========================
+    # TAB 3 — TEMPORAL
+    # =========================
+    with tab_temp:
+        st.subheader("Patrones Temporales de Venta")
+
+        if {'transaction_date', 'total_spent'}.issubset(df.columns):
+            df_temp = df.copy()
+            df_temp['date'] = df_temp['transaction_date'].dt.date
+
+            daily_sales = (
+                df_temp.groupby('date')['total_spent']
+                .sum()
+                .reset_index()
+            )
+
+            fig = px.line(
+                daily_sales,
+                x='date',
+                y='total_spent',
+                title='Evolución Diaria de Ventas',
+                labels={'date': 'Fecha', 'total_spent': 'Ventas Totales'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        if {'weekday', 'total_spent'}.issubset(df.columns):
+            weekday_sales = (
+                df.groupby('weekday')['total_spent']
+                .sum()
+                .reset_index()
+            )
+
+            order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            weekday_sales['weekday'] = pd.Categorical(
+                weekday_sales['weekday'],
+                categories=order,
+                ordered=True
+            )
+            weekday_sales = weekday_sales.sort_values('weekday')
+
+            fig = px.bar(
+                weekday_sales,
+                x='weekday',
+                y='total_spent',
+                title='Ventas por Día de la Semana',
+                labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    # =========================
+    # TAB 4 — REPORTE
+    # =========================
+    with tab_report:
+        st.subheader("Resumen Ejecutivo")
+
+        st.metric("Ventas Totales", f"${df['total_spent'].sum():,.0f}")
+        st.metric("Ticket Promedio", f"${df['total_spent'].mean():,.2f}")
+        st.metric("Total Transacciones", len(df))
+
+        with st.expander("Ver estadísticas descriptivas"):
+            st.dataframe(df.describe())
+
+        with st.expander("Descargar datos limpios"):
+            st.download_button(
+                "📥 Descargar CSV",
+                df.to_csv(index=False),
+                "datos_limpios.csv",
+                "text/csv"
+            )
+
 
 
 # =====================================================
