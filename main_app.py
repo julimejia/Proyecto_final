@@ -40,13 +40,18 @@ class CleaningLogger:
 # =========================================================
 # LOADER
 # =========================================================
+
 def cargar_retail_sales(file):
 
     df_raw = pd.read_csv(file)
     df = df_raw.copy()
     logger = CleaningLogger()
 
-    # --------------------------------------------------
+    # ----------------------------------------
+    # Normalizar nombres de columnas
+    df.columns = df.columns.str.strip()
+
+    # ----------------------------------------
     # Duplicados
     before = len(df)
     df = df.drop_duplicates()
@@ -54,44 +59,97 @@ def cargar_retail_sales(file):
         "Eliminar duplicados",
         before,
         len(df),
-        "Registros repetidos sesgan agregaciones",
+        "Registros repetidos generan sesgo",
         "drop_duplicates()"
     )
 
-    # --------------------------------------------------
-    # Conversión de fecha
-    df["Transaction Date"] = pd.to_datetime(
-        df["Transaction Date"],
-        errors="coerce"
-    )
+    # ----------------------------------------
+    # Tipos numéricos
+    numeric_cols = ["Price Per Unit", "Quantity", "Total Spent"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # --------------------------------------------------
-    # Price inválido
-    df["Price Per Unit"] = pd.to_numeric(df["Price Per Unit"], errors="coerce")
-
-    before = len(df)
-    df = df[df["Price Per Unit"] >= 0]
-    logger.log(
-        "Eliminar precios negativos",
-        before,
-        len(df),
-        "Precio negativo no válido",
-        "Price >= 0"
-    )
-
-    # --------------------------------------------------
-    # Quantity inválida
-    df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
+    # ----------------------------------------
+    # Convertir fecha
+    df["Transaction Date"] = pd.to_datetime(df["Transaction Date"], errors="coerce")
 
     before = len(df)
-    df = df[df["Quantity"] > 0]
+    df = df[df["Transaction Date"].notna()]
     logger.log(
-        "Eliminar cantidades inválidas",
+        "Eliminar fechas inválidas",
         before,
         len(df),
-        "Cantidad debe ser positiva",
-        "Quantity > 0"
+        "Fechas corruptas no analizables",
+        "dropna(Transaction Date)"
     )
+
+    # ----------------------------------------
+    # Valores negativos
+    before = len(df)
+    df = df[(df["Price Per Unit"] > 0) & (df["Quantity"] > 0)]
+    logger.log(
+        "Eliminar valores negativos",
+        before,
+        len(df),
+        "Precio y cantidad deben ser positivos",
+        "Price>0 & Quantity>0"
+    )
+
+    # ----------------------------------------
+    # Recalcular total spent inconsistente
+    df["Expected Total"] = df["Price Per Unit"] * df["Quantity"]
+
+    before = len(df)
+    df = df[np.isclose(df["Total Spent"], df["Expected Total"], atol=0.01)]
+    logger.log(
+        "Eliminar inconsistencias contables",
+        before,
+        len(df),
+        "Total Spent inconsistente con Price*Quantity",
+        "np.isclose()"
+    )
+
+    df.drop(columns=["Expected Total"], inplace=True)
+
+    # ----------------------------------------
+    # Outliers IQR (Price)
+    Q1 = df["Price Per Unit"].quantile(0.25)
+    Q3 = df["Price Per Unit"].quantile(0.75)
+    IQR = Q3 - Q1
+
+    before = len(df)
+    df = df[(df["Price Per Unit"] >= Q1 - 1.5*IQR) &
+            (df["Price Per Unit"] <= Q3 + 1.5*IQR)]
+
+    logger.log(
+        "Eliminar outliers de precio",
+        before,
+        len(df),
+        "Precios extremos fuera del rango IQR",
+        "IQR filtering"
+    )
+
+    # ----------------------------------------
+    # Quantity outliers
+    Q1 = df["Quantity"].quantile(0.25)
+    Q3 = df["Quantity"].quantile(0.75)
+    IQR = Q3 - Q1
+
+    before = len(df)
+    df = df[(df["Quantity"] >= Q1 - 1.5*IQR) &
+            (df["Quantity"] <= Q3 + 1.5*IQR)]
+
+    logger.log(
+        "Eliminar outliers de cantidad",
+        before,
+        len(df),
+        "Cantidades fuera del rango IQR",
+        "IQR filtering"
+    )
+
+    # ----------------------------------------
+    # Discount column limpieza
+    df["Discount Applied"] = df["Discount Applied"].fillna(False).astype(bool)
 
     filas_eliminadas = len(df_raw) - len(df)
 
