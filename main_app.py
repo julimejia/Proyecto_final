@@ -540,12 +540,12 @@ def show_business_analysis_page():
                 
                 # Gráfico de barras
                 fig = create_simple_bar_chart(
-                    top_categories,
-                    'index',
-                    'ingreso_total',
-                    'Top 5 Categorías por Ingreso Total',
-                    color_col='index'
-                )
+                                top_categories,
+                                'category',
+                                'ingreso_total',
+                                'Top 5 Categorías por Ingreso Total',
+                                color_col='category'
+                            )
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
@@ -554,12 +554,12 @@ def show_business_analysis_page():
                 st.dataframe(bottom_rentability, use_container_width=True)
                 
                 fig = create_simple_bar_chart(
-                    bottom_rentability,
-                    'index',
-                    'rentabilidad',
-                    'Bottom 5 Categorías por Rentabilidad',
-                    color_col='index'
-                )
+                        bottom_rentability,
+                        'category',
+                        'rentabilidad',
+                        'Bottom 5 Categorías por Rentabilidad',
+                        color_col='category'
+                    )
                 st.plotly_chart(fig, use_container_width=True)
             
             # Insights
@@ -592,12 +592,13 @@ def show_business_analysis_page():
                     # Gráfico para el top 5
                     if 'total_spent_mean' in analysis.columns:
                         top_segments = analysis.head(5)
+                        x_col = analysis.index.name
                         fig = create_simple_bar_chart(
                             top_segments,
-                            'index',
+                            x_col,
                             'total_spent_mean',
                             f'Top 5 {segment_type.title()} por Ticket Promedio',
-                            color_col='index'
+                            color_col=x_col
                         )
                         st.plotly_chart(fig, use_container_width=True)
         
@@ -617,13 +618,15 @@ def show_business_analysis_page():
                     
                     # Gráfico
                     if 'total_spent_sum' in analysis.columns:
+                        x_col = analysis.index.name
+
                         fig = create_simple_bar_chart(
                             analysis,
-                            'index',
+                            x_col,
                             'total_spent_sum',
-                            f'Ventas Totales por {pattern_type.title()}',
-                            color_col='index'
-                        )
+                            f'Ventas Totales por {pattern_type.replace("_", " ").title()}',
+                            color_col=x_col
+                        )   
                         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
