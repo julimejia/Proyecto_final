@@ -285,25 +285,24 @@ def analyze_temporal_patterns(df):
 # =====================================================
 # VISUALIZACIONES SIMPLES Y CLARAS
 # =====================================================
-def create_simple_bar_chart(data, x_col, y_col, title, color_col=None):
-    """Crea gráfico de barras simple"""
-    # Reset index para convertir el índice en columna
-    plot_data = data.reset_index()
-    
+def create_simple_bar_chart(df, x_col, y_col, title, color_col=None):
+    plot_data = df.reset_index()  # 🔑 convierte índice en columna real
+
     fig = px.bar(
         plot_data,
         x=x_col,
         y=y_col,
-        title=title,
         color=color_col,
+        title=title,
         text_auto=True
     )
+
     fig.update_layout(
-        plot_bgcolor='white',
-        xaxis_title=x_col,
-        yaxis_title=y_col,
-        showlegend=color_col is not None
+        template="plotly_white",
+        xaxis_title=x_col.replace("_", " ").title(),
+        yaxis_title=y_col.replace("_", " ").title()
     )
+
     return fig
 
 
