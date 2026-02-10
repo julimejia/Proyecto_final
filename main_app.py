@@ -53,6 +53,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # =====================================================
 # FUNCIONES DE CACHÉ
 # =====================================================
@@ -65,6 +66,7 @@ def load_file(file):
     except Exception as e:
         st.error(f"Error al cargar archivo: {str(e)}")
         return None
+
 
 # =====================================================
 # LIMPIEZA DE DATOS (SIMPLIFICADA Y EFECTIVA)
@@ -81,7 +83,7 @@ def clean_retail_data(df):
     initial_cols = len(df.columns)
     transformations.append(f"📊 **ANÁLISIS INICIAL:** {initial_rows:,} registros, {initial_cols} columnas")
     
-    # 2. ELIMINAR COLUMNAS INNECESARIAS (como en el notebook)
+    # 2. ELIMINAR COLUMNAS INNECESARIAS
     columns_to_drop = []
     if 'Transaction ID' in df.columns:
         columns_to_drop.append('Transaction ID')
@@ -92,27 +94,27 @@ def clean_retail_data(df):
         df = df.drop(columns=columns_to_drop)
         transformations.append(f"🗑️ **Columnas eliminadas:** {', '.join(columns_to_drop)}")
     
-    # 3. NORMALIZAR NOMBRES DE COLUMNAS (snake_case como en notebook)
+    # 3. NORMALIZAR NOMBRES DE COLUMNAS
     df.columns = df.columns.str.lower().str.replace(' ', '_', regex=True)
     transformations.append("🔄 **Columnas convertidas a snake_case**")
     
     # 4. MANEJO DE VALORES FALTANTES
     transformations.append("\n🔍 **MANEJO DE VALORES FALTANTES:**")
     
-    # Rellenar discount_applied con 0 como en el notebook
+    # Rellenar discount_applied con 0
     if 'discount_applied' in df.columns:
         missing_discount = df['discount_applied'].isnull().sum()
         df['discount_applied'] = df['discount_applied'].fillna(0).astype(int)
         transformations.append(f"   • discount_applied: {missing_discount:,} valores nulos rellenados con 0")
     
-    # Eliminar filas con otros valores nulos (como en notebook)
+    # Eliminar filas con otros valores nulos
     missing_before = df.isnull().sum().sum()
     df = df.dropna()
     missing_after = df.isnull().sum().sum()
     rows_removed = missing_before - missing_after
     transformations.append(f"   • Eliminadas {rows_removed:,} filas con valores nulos")
     
-    # 5. CONVERSIÓN DE TIPOS DE DATOS (como en notebook)
+    # 5. CONVERSIÓN DE TIPOS DE DATOS
     transformations.append("\n🔄 **CONVERSIÓN DE TIPOS DE DATOS:**")
     
     # Convertir columnas categóricas
@@ -137,7 +139,7 @@ def clean_retail_data(df):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
     
-    # 6. FEATURE ENGINEERING BÁSICO (como en notebook)
+    # 6. FEATURE ENGINEERING BÁSICO
     transformations.append("\n⚙️ **FEATURE ENGINEERING:**")
     
     if 'transaction_date' in df.columns:
@@ -159,6 +161,7 @@ def clean_retail_data(df):
     transformations.append(f"   • Valores faltantes restantes: {df.isnull().sum().sum():,}")
     
     return df, df_original, transformations
+
 
 # =====================================================
 # ANÁLISIS PARA PREGUNTAS DE NEGOCIO
@@ -186,6 +189,7 @@ def analyze_category_profitability(df):
     analysis['rentabilidad'] = (analysis['ingreso_total'] / analysis['transacciones']).round(2)
     
     return analysis.sort_values('ingreso_total', ascending=False)
+
 
 def analyze_customer_segments(df):
     """Analiza segmentos de clientes (Pregunta 2)"""
@@ -226,6 +230,7 @@ def analyze_customer_segments(df):
     
     return results
 
+
 def analyze_temporal_patterns(df):
     """Analiza patrones temporales (Pregunta 3)"""
     results = {}
@@ -262,7 +267,7 @@ def analyze_temporal_patterns(df):
             
             results['mes'] = monthly_pattern
         
-        # Análisis por hora del día (si existe)
+        # Análisis por hora del día
         if 'transaction_date' in df.columns:
             df['hour'] = df['transaction_date'].dt.hour
             hourly_pattern = df.groupby('hour').agg({
@@ -276,55 +281,70 @@ def analyze_temporal_patterns(df):
     
     return results
 
+
 # =====================================================
 # VISUALIZACIONES SIMPLES Y CLARAS
 # =====================================================
-def create_simple_bar_chart(data, x_col, y_col, title, color=None):
+def create_simple_bar_chart(data, x_col, y_col, title, color_col=None):
     """Crea gráfico de barras simple"""
+    # Reset index para convertir el índice en columna
+    plot_data = data.reset_index()
+    
     fig = px.bar(
-        data.reset_index(),
+        plot_data,
         x=x_col,
         y=y_col,
         title=title,
-        color=color if color else None,
+        color=color_col,
         text_auto=True
     )
     fig.update_layout(
         plot_bgcolor='white',
         xaxis_title=x_col,
         yaxis_title=y_col,
-        showlegend=True if color else False
+        showlegend=color_col is not None
     )
     return fig
+
 
 def create_box_plot(df, y_col, title):
     """Crea box plot simple"""
-    fig = px.box(
-        df,
-        y=y_col,
-        title=title,
-        points="outliers"
-    )
-    fig.update_layout(
-        plot_bgcolor='white',
-        yaxis_title=y_col
-    )
-    return fig
+    try:
+        fig = px.box(
+            df,
+            y=y_col,
+            title=title,
+            points="outliers"
+        )
+        fig.update_layout(
+            plot_bgcolor='white',
+            yaxis_title=y_col
+        )
+        return fig
+    except Exception as e:
+        st.error(f"Error creando box plot: {str(e)}")
+        return None
+
 
 def create_heatmap(df, title):
     """Crea mapa de calor de correlaciones"""
-    numeric_df = df.select_dtypes(include=[np.number])
-    if len(numeric_df.columns) > 1:
-        corr_matrix = numeric_df.corr()
-        fig = px.imshow(
-            corr_matrix,
-            title=title,
-            color_continuous_scale='RdBu',
-            text_auto=True,
-            aspect="auto"
-        )
-        return fig
-    return None
+    try:
+        numeric_df = df.select_dtypes(include=[np.number])
+        if len(numeric_df.columns) > 1:
+            corr_matrix = numeric_df.corr()
+            fig = px.imshow(
+                corr_matrix,
+                title=title,
+                color_continuous_scale='RdBu',
+                text_auto='.2f',
+                aspect="auto"
+            )
+            return fig
+        return None
+    except Exception as e:
+        st.error(f"Error creando heatmap: {str(e)}")
+        return None
+
 
 # =====================================================
 # INTERFAZ PRINCIPAL
@@ -375,21 +395,18 @@ def main():
     # Páginas principales
     if page == "🏠 Inicio":
         show_home_page()
-    
     elif page == "🔄 Limpieza":
         show_cleaning_page()
-    
     elif page == "📈 Análisis Negocio":
         show_business_analysis_page()
-    
     elif page == "📊 Visualizaciones":
         show_visualizations_page()
-    
     elif page == "📋 KPIs":
         show_kpis_page()
 
+
 # =====================================================
-# PÁGINAS DE LA APLICACIÓN
+# PÁGINA: INICIO
 # =====================================================
 def show_home_page():
     st.markdown('<h1 class="main-header">🏠 Dashboard Retail Inteligente</h1>', unsafe_allow_html=True)
@@ -447,6 +464,10 @@ def show_home_page():
     else:
         st.info("👈 Sube un archivo CSV y procésalo para ver los datos")
 
+
+# =====================================================
+# PÁGINA: LIMPIEZA
+# =====================================================
 def show_cleaning_page():
     st.markdown('<h1 class="main-header">🔄 Limpieza de Datos</h1>', unsafe_allow_html=True)
     
@@ -495,6 +516,10 @@ def show_cleaning_page():
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
+
+# =====================================================
+# PÁGINA: ANÁLISIS DE NEGOCIO
+# =====================================================
 def show_business_analysis_page():
     st.markdown('<h1 class="main-header">📈 Análisis de Negocio</h1>', unsafe_allow_html=True)
     
@@ -517,10 +542,10 @@ def show_business_analysis_page():
                 # Gráfico de barras
                 fig = create_simple_bar_chart(
                     top_categories,
-                    top_categories.index,
+                    'index',
                     'ingreso_total',
                     'Top 5 Categorías por Ingreso Total',
-                    color=top_categories.index
+                    color_col='index'
                 )
                 st.plotly_chart(fig, use_container_width=True)
             
@@ -531,19 +556,24 @@ def show_business_analysis_page():
                 
                 fig = create_simple_bar_chart(
                     bottom_rentability,
-                    bottom_rentability.index,
+                    'index',
                     'rentabilidad',
                     'Bottom 5 Categorías por Rentabilidad',
-                    color=bottom_rentability.index
+                    color_col='index'
                 )
                 st.plotly_chart(fig, use_container_width=True)
             
             # Insights
             if not category_analysis.empty:
+                top_category = category_analysis.index[0]
+                top_income = category_analysis.iloc[0]['ingreso_total']
+                bottom_category = category_analysis.sort_values('rentabilidad').index[0]
+                bottom_rent = category_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']
+                
                 st.info(f"""
                 **💡 Insights:**
-                - Categoría con mayor ingreso: **{category_analysis.index[0]}** (${category_analysis.iloc[0]['ingreso_total']:,.0f})
-                - Categoría con menor rentabilidad: **{category_analysis.sort_values('rentabilidad').index[0]}** (${category_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']:,.2f} por transacción)
+                - Categoría con mayor ingreso: **{top_category}** (${top_income:,.0f})
+                - Categoría con menor rentabilidad: **{bottom_category}** (${bottom_rent:,.2f} por transacción)
                 """)
         
         # Pregunta 2: Segmentos de clientes
@@ -565,10 +595,10 @@ def show_business_analysis_page():
                         top_segments = analysis.head(5)
                         fig = create_simple_bar_chart(
                             top_segments,
-                            top_segments.index,
+                            'index',
                             'total_spent_mean',
                             f'Top 5 {segment_type.title()} por Ticket Promedio',
-                            color=top_segments.index
+                            color_col='index'
                         )
                         st.plotly_chart(fig, use_container_width=True)
         
@@ -590,15 +620,19 @@ def show_business_analysis_page():
                     if 'total_spent_sum' in analysis.columns:
                         fig = create_simple_bar_chart(
                             analysis,
-                            analysis.index,
+                            'index',
                             'total_spent_sum',
                             f'Ventas Totales por {pattern_type.title()}',
-                            color=analysis.index
+                            color_col='index'
                         )
                         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
+
+# =====================================================
+# PÁGINA: VISUALIZACIONES
+# =====================================================
 def show_visualizations_page():
     st.markdown('<h1 class="main-header">📊 Visualizaciones</h1>', unsafe_allow_html=True)
     
@@ -619,53 +653,68 @@ def show_visualizations_page():
             with col1:
                 if 'total_spent' in df.columns:
                     fig = create_box_plot(df, 'total_spent', 'Distribución de Montos de Venta')
-                    st.plotly_chart(fig, use_container_width=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("No se pudo crear el gráfico de caja para total_spent")
             
             with col2:
                 if 'quantity' in df.columns:
                     fig = create_box_plot(df, 'quantity', 'Distribución de Cantidades Vendidas')
-                    st.plotly_chart(fig, use_container_width=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("No se pudo crear el gráfico de caja para quantity")
             
             # Histograma simple
             if 'total_spent' in df.columns:
-                fig = px.histogram(
-                    df,
-                    x='total_spent',
-                    nbins=30,
-                    title='Distribución de Montos de Venta',
-                    labels={'total_spent': 'Monto ($)'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    fig = px.histogram(
+                        df,
+                        x='total_spent',
+                        nbins=30,
+                        title='Distribución de Montos de Venta',
+                        labels={'total_spent': 'Monto ($)'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error creando histograma: {str(e)}")
         
         elif viz_type == "Comparaciones":
             st.markdown('<h3 class="sub-header">🔗 Comparaciones</h3>', unsafe_allow_html=True)
             
             # Comparación por categoría
             if 'category' in df.columns and 'total_spent' in df.columns:
-                category_sales = df.groupby('category')['total_spent'].sum().sort_values(ascending=False).head(10)
-                
-                fig = px.bar(
-                    category_sales,
-                    x=category_sales.values,
-                    y=category_sales.index,
-                    orientation='h',
-                    title='Top 10 Categorías por Ventas',
-                    labels={'x': 'Ventas Totales', 'y': 'Categoría'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    category_sales = df.groupby('category')['total_spent'].sum().sort_values(ascending=False).head(10)
+                    
+                    fig = px.bar(
+                        category_sales.reset_index(),
+                        x='total_spent',
+                        y='category',
+                        orientation='h',
+                        title='Top 10 Categorías por Ventas',
+                        labels={'total_spent': 'Ventas Totales', 'category': 'Categoría'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error creando gráfico de categorías: {str(e)}")
             
             # Comparación por ubicación
             if 'location' in df.columns and 'total_spent' in df.columns:
-                location_sales = df.groupby('location')['total_spent'].sum().sort_values(ascending=False)
-                
-                fig = px.bar(
-                    location_sales,
-                    x=location_sales.index,
-                    y=location_sales.values,
-                    title='Ventas por Ubicación',
-                    labels={'x': 'Ubicación', 'y': 'Ventas Totales'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    location_sales = df.groupby('location')['total_spent'].sum().sort_values(ascending=False)
+                    
+                    fig = px.bar(
+                        location_sales.reset_index(),
+                        x='location',
+                        y='total_spent',
+                        title='Ventas por Ubicación',
+                        labels={'location': 'Ubicación', 'total_spent': 'Ventas Totales'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error creando gráfico de ubicaciones: {str(e)}")
         
         elif viz_type == "Relaciones":
             st.markdown('<h3 class="sub-header">🔗 Relaciones entre Variables</h3>', unsafe_allow_html=True)
@@ -674,6 +723,8 @@ def show_visualizations_page():
             heatmap = create_heatmap(df, 'Correlaciones entre Variables Numéricas')
             if heatmap:
                 st.plotly_chart(heatmap, use_container_width=True)
+            else:
+                st.info("No hay suficientes variables numéricas para crear un mapa de calor")
             
             # Scatter plot simple
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -686,51 +737,64 @@ def show_visualizations_page():
                 with col2:
                     y_var = st.selectbox("Variable Y", numeric_cols, index=1 if len(numeric_cols) > 1 else 0)
                 
-                fig = px.scatter(
-                    df,
-                    x=x_var,
-                    y=y_var,
-                    title=f'{x_var} vs {y_var}',
-                    trendline='ols'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    fig = px.scatter(
+                        df,
+                        x=x_var,
+                        y=y_var,
+                        title=f'{x_var} vs {y_var}',
+                        trendline='ols'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error creando scatter plot: {str(e)}")
         
         elif viz_type == "Temporal":
             st.markdown('<h3 class="sub-header">📅 Análisis Temporal</h3>', unsafe_allow_html=True)
             
             if 'transaction_date' in df.columns and 'total_spent' in df.columns:
-                # Serie temporal diaria
-                df_temp = df.copy()
-                df_temp['date'] = df_temp['transaction_date'].dt.date
-                daily_sales = df_temp.groupby('date')['total_spent'].sum().reset_index()
-                
-                fig = px.line(
-                    daily_sales,
-                    x='date',
-                    y='total_spent',
-                    title='Ventas Diarias',
-                    labels={'date': 'Fecha', 'total_spent': 'Ventas Totales'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    # Serie temporal diaria
+                    df_temp = df.copy()
+                    df_temp['date'] = df_temp['transaction_date'].dt.date
+                    daily_sales = df_temp.groupby('date')['total_spent'].sum().reset_index()
+                    
+                    fig = px.line(
+                        daily_sales,
+                        x='date',
+                        y='total_spent',
+                        title='Ventas Diarias',
+                        labels={'date': 'Fecha', 'total_spent': 'Ventas Totales'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error creando gráfico temporal diario: {str(e)}")
                 
                 # Ventas por día de semana
                 if 'weekday' in df.columns:
-                    weekday_sales = df.groupby('weekday')['total_spent'].sum().reset_index()
-                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                    weekday_sales['weekday'] = pd.Categorical(weekday_sales['weekday'], categories=day_order, ordered=True)
-                    weekday_sales = weekday_sales.sort_values('weekday')
-                    
-                    fig = px.bar(
-                        weekday_sales,
-                        x='weekday',
-                        y='total_spent',
-                        title='Ventas por Día de la Semana',
-                        labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    try:
+                        weekday_sales = df.groupby('weekday')['total_spent'].sum().reset_index()
+                        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                        weekday_sales['weekday'] = pd.Categorical(weekday_sales['weekday'], categories=day_order, ordered=True)
+                        weekday_sales = weekday_sales.sort_values('weekday')
+                        
+                        fig = px.bar(
+                            weekday_sales,
+                            x='weekday',
+                            y='total_spent',
+                            title='Ventas por Día de la Semana',
+                            labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error creando gráfico por día de semana: {str(e)}")
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
+
+# =====================================================
+# PÁGINA: KPIs
+# =====================================================
 def show_kpis_page():
     st.markdown('<h1 class="main-header">📋 Panel de KPIs</h1>', unsafe_allow_html=True)
     
@@ -805,6 +869,7 @@ def show_kpis_page():
                     st.metric("📈 Crecimiento vs período anterior", f"{growth:.1f}%")
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
+
 
 # =====================================================
 # EJECUCIÓN PRINCIPAL
