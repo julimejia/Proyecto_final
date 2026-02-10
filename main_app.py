@@ -364,9 +364,16 @@ def main():
         
         # Navegación
         page = st.radio(
-            "Navegación",
-            ["🏠 Inicio", "🔄 Limpieza", "📈 Análisis Negocio", "📊 Visualizaciones", "📋 KPIs"]
-        )
+    "Navegación",
+    [
+        "🏠 Inicio",
+        "🔄 Limpieza",
+        "📈 Análisis Negocio",
+        "📊 Visualizaciones",
+        "📋 KPIs",
+        "🤖 Insights IA"
+    ]
+)
         
         # Carga de datos
         st.markdown("---")
@@ -908,6 +915,113 @@ def show_kpis_page():
     else:
         st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
+def generate_ai_insights(df):
+    """
+    Genera insights usando Groq LLM basado en estadísticas del dataset
+    """
+    api_key = st.secrets.get("GROQ_API_KEY", None)
+    if api_key is None:
+        raise ValueError("No se encontró GROQ_API_KEY en st.secrets")
+
+    # Resumen estadístico
+    describe = df.describe().round(2).to_string()
+
+    # Tendencias simples
+    trends = []
+    if 'total_spent' in df.columns:
+        trends.append(f"Venta promedio: {df['total_spent'].mean():.2f}")
+        trends.append(f"Venta máxima: {df['total_spent'].max():.2f}")
+
+    if 'category' in df.columns:
+        top_category = df.groupby('category')['total_spent'].sum().idxmax()
+        trends.append(f"Categoría dominante: {top_category}")
+
+    trends_text = "\n".join(trends)
+
+    prompt = f"""
+Eres un analista de datos senior especializado en retail.
+
+Datos estadísticos:
+{describe}
+
+Tendencias detectadas:
+{trends_text}
+
+Proporciona:
+1. 3 insights principales del negocio
+2. 2 riesgos potenciales
+3. 3 recomendaciones estratégicas accionables
+4. 1 pregunta estratégica para profundizar el análisis
+
+Responde en español, de forma clara, ejecutiva y estructurada.
+"""
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+
+    payload = {
+        "model": "llama3-70b-8192",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+    if response.status_code != 200:
+        raise RuntimeError(f"Error Groq API: {response.text}")
+
+    return response.json()["choices"][0]["message"]["content"]
+
+
+def show_ai_insights_page():
+    st.markdown('<h1 class="main-header">🤖 Insights Generados con IA</h1>', unsafe_allow_html=True)
+
+    if st.session_state.df_clean is None:
+        st.warning("⚠️ Primero debes cargar y limpiar los datos.")
+        return
+
+    df = st.session_state.df_clean
+
+    st.markdown("""
+    Esta sección utiliza **IA Generativa (Groq + LLaMA 3)** para interpretar
+    automáticamente los resultados del EDA y generar recomendaciones de negocio.
+    """)
+
+    with st.expander("⚙️ Configuración de IA", expanded=True):
+        st.write("La clave API se obtiene desde `st.secrets` (no hardcodeada).")
+        st.write("Modelo: **LLaMA 3 – 70B**")
+
+    if st.button("🚀 Generar Insights con IA", type="primary"):
+        with st.spinner("Analizando datos y generando insights..."):
+            try:
+                insights = generate_ai_insights(df)
+
+                st.success("✅ Insights generados correctamente")
+
+                st.markdown("### 🧠 Análisis Ejecutivo")
+                st.markdown(insights)
+
+                # Guardar en sesión
+                st.session_state.ai_insights = insights
+
+            except Exception as e:
+                st.error(f"Error generando insights: {str(e)}")
+
+    # Exportar insights
+    if "ai_insights" in st.session_state:
+        st.markdown("---")
+        st.subheader("📥 Exportar Insights")
+
+        st.download_button(
+            "Descargar Insights (TXT)",
+            st.session_state.ai_insights,
+            "insights_ia.txt",
+            "text/plain"
+        )
 
 # =====================================================
 # EJECUCIÓN PRINCIPAL
