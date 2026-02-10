@@ -1,308 +1,210 @@
 # =========================================================
-# RETAIL STORE SALES – EDA + DATA CLEANING DASHBOARD
+# SMART RETAIL ANALYTICS DASHBOARD
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 # =========================================================
-# PAGE CONFIG
+# CONFIG
 # =========================================================
-st.set_page_config(page_title="Retail Sales EDA", layout="wide")
-st.title("📊 Retail Store Sales — Data Quality & EDA Dashboard")
-st.markdown("---")
+st.set_page_config(layout="wide", page_title="Smart Retail Dashboard")
 
-
-# =========================================================
-# CLEANING LOGGER
-# =========================================================
-class CleaningLogger:
-    def __init__(self):
-        self.steps = []
-
-    def log(self, name, before, after, reason, method):
-        self.steps.append({
-            "Paso": len(self.steps) + 1,
-            "Proceso": name,
-            "Filas antes": before,
-            "Filas después": after,
-            "Eliminadas": before - after,
-            "Razón": reason,
-            "Método": method
-        })
-
-    def to_df(self):
-        return pd.DataFrame(self.steps)
-
+st.title("🧠 Smart Retail Analytics Dashboard")
 
 # =========================================================
-# LOADER
+# SIDEBAR NAVIGATION
 # =========================================================
+st.sidebar.title("Navigation")
 
-def cargar_retail_sales(file):
+page = st.sidebar.radio(
+    "Go to",
+    ["ETL", "EDA", "KPIs", "AI Insights"]
+)
 
-    df_raw = pd.read_csv(file)
-    df = df_raw.copy()
-    logger = CleaningLogger()
+# =========================================================
+# FILE INPUT
+# =========================================================
+st.sidebar.subheader("Data Source")
 
-    # ----------------------------------------
-    # Normalizar nombres de columnas
-    df.columns = df.columns.str.strip()
+uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
-    # ----------------------------------------
-    # Duplicados
-    before = len(df)
-    df = df.drop_duplicates()
-    logger.log(
-        "Eliminar duplicados",
-        before,
-        len(df),
-        "Registros repetidos generan sesgo",
-        "drop_duplicates()"
-    )
+url_data = st.sidebar.text_input("Or paste dataset URL")
 
-    # ----------------------------------------
-    # Tipos numéricos
-    numeric_cols = ["Price Per Unit", "Quantity", "Total Spent"]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+@st.cache_data
+def load_data(file, url):
+    if file:
+        return pd.read_csv(file)
+    if url:
+        return pd.read_csv(url)
+    return None
 
-    # ----------------------------------------
-    # Convertir fecha
+df_original = load_data(uploaded_file, url_data)
+
+if df_original is None:
+    st.warning("Upload dataset to continue")
+    st.stop()
+
+if "df" not in st.session_state:
+    st.session_state.df = df_original.copy()
+
+df = st.session_state.df
+
+# =========================================================
+# GLOBAL FILTERS
+# =========================================================
+st.sidebar.subheader("Global Filters")
+
+if "Transaction Date" in df.columns:
     df["Transaction Date"] = pd.to_datetime(df["Transaction Date"], errors="coerce")
 
-    before = len(df)
-    df = df[df["Transaction Date"].notna()]
-    logger.log(
-        "Eliminar fechas inválidas",
-        before,
-        len(df),
-        "Fechas corruptas no analizables",
-        "dropna(Transaction Date)"
-    )
+    min_date, max_date = df["Transaction Date"].min(), df["Transaction Date"].max()
+    date_range = st.sidebar.date_input("Date range", [min_date, max_date])
 
-    # ----------------------------------------
-    # Valores negativos
-    before = len(df)
-    df = df[(df["Price Per Unit"] > 0) & (df["Quantity"] > 0)]
-    logger.log(
-        "Eliminar valores negativos",
-        before,
-        len(df),
-        "Precio y cantidad deben ser positivos",
-        "Price>0 & Quantity>0"
-    )
+    df = df[(df["Transaction Date"] >= pd.to_datetime(date_range[0])) &
+            (df["Transaction Date"] <= pd.to_datetime(date_range[1]))]
 
-    # ----------------------------------------
-    # Recalcular total spent inconsistente
-    df["Expected Total"] = df["Price Per Unit"] * df["Quantity"]
-
-    before = len(df)
-    df = df[np.isclose(df["Total Spent"], df["Expected Total"], atol=0.01)]
-    logger.log(
-        "Eliminar inconsistencias contables",
-        before,
-        len(df),
-        "Total Spent inconsistente con Price*Quantity",
-        "np.isclose()"
-    )
-
-    df.drop(columns=["Expected Total"], inplace=True)
-
-    # ----------------------------------------
-    # Outliers IQR (Price)
-    Q1 = df["Price Per Unit"].quantile(0.25)
-    Q3 = df["Price Per Unit"].quantile(0.75)
-    IQR = Q3 - Q1
-
-    before = len(df)
-    df = df[(df["Price Per Unit"] >= Q1 - 1.5*IQR) &
-            (df["Price Per Unit"] <= Q3 + 1.5*IQR)]
-
-    logger.log(
-        "Eliminar outliers de precio",
-        before,
-        len(df),
-        "Precios extremos fuera del rango IQR",
-        "IQR filtering"
-    )
-
-    # ----------------------------------------
-    # Quantity outliers
-    Q1 = df["Quantity"].quantile(0.25)
-    Q3 = df["Quantity"].quantile(0.75)
-    IQR = Q3 - Q1
-
-    before = len(df)
-    df = df[(df["Quantity"] >= Q1 - 1.5*IQR) &
-            (df["Quantity"] <= Q3 + 1.5*IQR)]
-
-    logger.log(
-        "Eliminar outliers de cantidad",
-        before,
-        len(df),
-        "Cantidades fuera del rango IQR",
-        "IQR filtering"
-    )
-
-    # ----------------------------------------
-    # Discount column limpieza
-    df["Discount Applied"] = df["Discount Applied"].fillna(False).astype(bool)
-
-    filas_eliminadas = len(df_raw) - len(df)
-
-    return df_raw, df, filas_eliminadas, logger
-
+if "Category" in df.columns:
+    categories = st.sidebar.multiselect("Categories", df["Category"].unique(), default=df["Category"].unique())
+    df = df[df["Category"].isin(categories)]
 
 # =========================================================
-# FILE UPLOAD
+# ======================== ETL TAB =========================
 # =========================================================
-file = st.file_uploader("Upload Retail Sales CSV", type=["csv"])
+if page == "ETL":
 
-if file:
+    st.header("Interactive ETL")
 
-    df_raw, df_clean, filas_eliminadas, logger = cargar_retail_sales(file)
+    col1, col2 = st.columns(2)
 
-    st.success(f"Dataset cargado correctamente — filas eliminadas: {filas_eliminadas}")
+    with col1:
+        remove_duplicates = st.checkbox("Remove duplicates")
 
-    # =========================================================
-    # DATA OVERVIEW
-    # =========================================================
-    st.subheader("Dataset Overview")
+        impute_method = st.selectbox(
+            "Missing value method",
+            ["None", "Mean", "Median", "Zero"]
+        )
 
-    col1, col2, col3 = st.columns(3)
+    with col2:
+        outlier_threshold = st.slider("Outlier IQR threshold", 1.0, 3.0, 1.5)
 
-    col1.metric("Filas originales", len(df_raw))
-    col2.metric("Filas limpias", len(df_clean))
-    col3.metric("Columnas", len(df_clean.columns))
+    df_etl = df_original.copy()
 
-    st.dataframe(df_clean.head())
+    if remove_duplicates:
+        df_etl = df_etl.drop_duplicates()
 
-    # =========================================================
-    # DATA QUALITY
-    # =========================================================
-    st.subheader("Data Quality Report")
+    numeric_cols = df_etl.select_dtypes(include=np.number).columns
 
-    missing = df_clean.isna().sum().sort_values(ascending=False)
-    st.bar_chart(missing)
+    if impute_method != "None":
+        for col in numeric_cols:
+            if impute_method == "Mean":
+                df_etl[col].fillna(df_etl[col].mean(), inplace=True)
+            elif impute_method == "Median":
+                df_etl[col].fillna(df_etl[col].median(), inplace=True)
+            else:
+                df_etl[col].fillna(0, inplace=True)
 
-    # =========================================================
-    # DISTRIBUCIONES
-    # =========================================================
-    st.subheader("Distribución de Variables Numéricas")
-
-    numeric_cols = df_clean.select_dtypes(include=np.number).columns
-
+    # outlier filtering
     for col in numeric_cols:
-        fig, ax = plt.subplots()
-        df_clean[col].hist(ax=ax, bins=40)
-        ax.set_title(col)
-        st.pyplot(fig)
-
-    # =========================================================
-    # SALES ANALYSIS
-    # =========================================================
-    st.subheader("Ventas por Categoría")
-
-    sales_cat = df_clean.groupby("Category")["Total Spent"].sum().sort_values()
-    st.bar_chart(sales_cat)
-
-    # =========================================================
-    # TIME ANALYSIS
-    # =========================================================
-    st.subheader("Ventas en el Tiempo")
-
-    time_sales = df_clean.groupby(df_clean["Transaction Date"].dt.date)["Total Spent"].sum()
-    st.line_chart(time_sales)
-
-    # =========================================================
-    # OUTLIER DETECTION
-    # =========================================================
-    st.subheader("Detección de Outliers (IQR)")
-
-    for col in numeric_cols:
-
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
+        Q1 = df_etl[col].quantile(0.25)
+        Q3 = df_etl[col].quantile(0.75)
         IQR = Q3 - Q1
+        df_etl = df_etl[(df_etl[col] >= Q1 - outlier_threshold*IQR) &
+                        (df_etl[col] <= Q3 + outlier_threshold*IQR)]
 
-        outliers = df_clean[(df_clean[col] < Q1 - 1.5*IQR) | (df_clean[col] > Q3 + 1.5*IQR)]
+    st.session_state.df = df_etl
 
-        st.write(f"{col} — outliers detectados:", len(outliers))
+    st.write("Preview cleaned data")
+    st.dataframe(df_etl.head())
 
-    # =========================================================
-    # CLEANING LOG
-    # =========================================================
-    st.subheader("Cleaning Log")
+# =========================================================
+# ======================== EDA TAB =========================
+# =========================================================
+if page == "EDA":
 
-    st.dataframe(logger.to_df())
-    # =========================================================
-    # DATA HEALTH SCORE
-    # =========================================================
-    st.subheader("Data Health Score")
+    st.header("Exploratory Analysis")
 
-    missing_pct = (df_clean.isna().sum().sum()) / (df_clean.shape[0] * df_clean.shape[1])
-    duplicate_pct = 1 - (len(df_clean.drop_duplicates()) / len(df_clean))
+    numeric_cols = df.select_dtypes(include=np.number).columns
 
-    health_score = int((1 - (missing_pct + duplicate_pct)/2) * 100)
+    col = st.selectbox("Select variable", numeric_cols)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Missing %", f"{missing_pct*100:.2f}%")
-    col2.metric("Duplicate %", f"{duplicate_pct*100:.2f}%")
-    col3.metric("Health Score", f"{health_score}/100")
+    fig = px.histogram(df, x=col)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # =========================================================
-    # CORRELATION MATRIX
-    # =========================================================
-    st.subheader("Correlation Matrix")
+    if len(numeric_cols) > 1:
+        colx = st.selectbox("X", numeric_cols)
+        coly = st.selectbox("Y", numeric_cols, index=1)
 
-    corr = df_clean.select_dtypes(include=np.number).corr()
+        fig = px.scatter(df, x=colx, y=coly, color="Category")
+        st.plotly_chart(fig, use_container_width=True)
 
-    fig, ax = plt.subplots()
-    cax = ax.matshow(corr)
-    fig.colorbar(cax)
+# =========================================================
+# ======================== KPI TAB =========================
+# =========================================================
+if page == "KPIs":
 
-    ax.set_xticks(range(len(corr.columns)))
-    ax.set_xticklabels(corr.columns, rotation=90)
-    ax.set_yticks(range(len(corr.columns)))
-    ax.set_yticklabels(corr.columns)
+    st.header("Business KPIs")
 
-    st.pyplot(fig)
+    revenue = df["Total Spent"].sum()
+    avg_ticket = df["Total Spent"].mean()
+    transactions = len(df)
 
-    # =========================================================
-    # BUSINESS KPIs
-    # =========================================================
-    st.subheader("Business KPIs")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Revenue", f"${revenue:,.0f}")
+    c2.metric("Avg Ticket", f"${avg_ticket:,.2f}")
+    c3.metric("Transactions", transactions)
 
-    total_revenue = df_clean["Total Spent"].sum()
-    avg_ticket = df_clean["Total Spent"].mean()
-    total_transactions = len(df_clean)
+    fig = px.bar(df.groupby("Category")["Total Spent"].sum().reset_index(),
+                 x="Category", y="Total Spent")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Revenue", f"${total_revenue:,.0f}")
-    col2.metric("Average Ticket", f"${avg_ticket:,.2f}")
-    col3.metric("Transactions", total_transactions)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # =========================================================
-    # TOP PRODUCTS
-    # =========================================================
-    st.subheader("Top Products")
+# =========================================================
+# ===================== AI INSIGHTS TAB ====================
+# =========================================================
+if page == "AI Insights":
 
-    top_items = df_clean.groupby("Item")["Total Spent"].sum().sort_values(ascending=False).head(10)
-    st.bar_chart(top_items)
+    st.header("AI Generated Insights")
 
-    # =========================================================
-    # EXPORT CLEAN DATA
-    # =========================================================
-    st.subheader("Export Clean Dataset")
+    api_key = st.sidebar.text_input("Groq API Key", type="password")
 
-    csv = df_clean.to_csv(index=False).encode("utf-8")
+    if st.button("Generate Insights"):
 
-    st.download_button(
-        label="Download Clean CSV",
-        data=csv,
-        file_name="retail_sales_clean.csv",
-        mime="text/csv"
-    )
+        if not api_key:
+            st.warning("Insert API key")
+        else:
+            from groq import Groq
+
+            client = Groq(api_key=api_key)
+
+            desc = df.describe().to_string()
+
+            prompt = f"""
+            Eres un analista senior.
+            Analiza estos datos:
+
+            {desc}
+
+            Proporciona:
+            1 insights
+            2 riesgos
+            3 recomendaciones
+            """
+
+            with st.spinner("Generating insights..."):
+                completion = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role":"user","content":prompt}]
+                )
+
+            st.write(completion.choices[0].message.content)
+
+# =========================================================
+# EXPORT
+# =========================================================
+st.sidebar.subheader("Export")
+
+csv = df.to_csv(index=False).encode()
+st.sidebar.download_button("Download CSV", csv, "clean_data.csv")
