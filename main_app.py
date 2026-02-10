@@ -169,8 +169,7 @@ def analyze_category_profitability(df):
         return None
     
     analysis = df.groupby("category").agg({
-        "total_spent": ["sum", "mean", "count"],
-        "quantity": "sum" if "quantity" in df.columns else None
+        "total_spent": ["sum", "mean", "count"]
     }).round(2)
     
     # Aplanar columnas multi-index
@@ -180,8 +179,7 @@ def analyze_category_profitability(df):
     analysis = analysis.rename(columns={
         'total_spent_sum': 'ingreso_total',
         'total_spent_mean': 'ticket_promedio',
-        'total_spent_count': 'transacciones',
-        'quantity_sum': 'unidades_vendidas'
+        'total_spent_count': 'transacciones'
     })
     
     # Calcular rentabilidad (ingreso por transacción)
@@ -196,8 +194,7 @@ def analyze_customer_segments(df):
     # Análisis por ubicación
     if 'location' in df.columns and 'total_spent' in df.columns:
         location_analysis = df.groupby('location').agg({
-            'total_spent': ['mean', 'sum', 'count'],
-            'customer_id': 'nunique' if 'customer_id' in df.columns else None
+            'total_spent': ['mean', 'sum', 'count']
         }).round(2)
         
         if location_analysis.columns.nlevels > 1:
@@ -333,6 +330,14 @@ def create_heatmap(df, title):
 # INTERFAZ PRINCIPAL
 # =====================================================
 def main():
+    # Inicializar variables de sesión si no existen
+    if 'df_clean' not in st.session_state:
+        st.session_state.df_clean = None
+    if 'df_original' not in st.session_state:
+        st.session_state.df_original = None
+    if 'transformations' not in st.session_state:
+        st.session_state.transformations = []
+    
     # Sidebar
     with st.sidebar:
         st.title("📊 Dashboard Retail")
@@ -356,7 +361,7 @@ def main():
                 st.info(f"📊 {len(df)} registros, {len(df.columns)} columnas")
                 
                 # Procesar datos
-                if 'df_clean' not in st.session_state or st.button("🔄 Procesar Datos"):
+                if st.button("🔄 Procesar Datos", type="primary"):
                     with st.spinner("Limpiando y procesando datos..."):
                         df_clean, df_original, transformations = clean_retail_data(df)
                         st.session_state.df = df
@@ -366,7 +371,6 @@ def main():
                         st.success("✅ Datos procesados")
         else:
             st.info("👆 Sube un archivo CSV para comenzar")
-            return
     
     # Páginas principales
     if page == "🏠 Inicio":
@@ -390,7 +394,7 @@ def main():
 def show_home_page():
     st.markdown('<h1 class="main-header">🏠 Dashboard Retail Inteligente</h1>', unsafe_allow_html=True)
     
-    if 'df_clean' in st.session_state:
+    if st.session_state.df_clean is not None:
         df = st.session_state.df_clean
         
         # Métricas principales
@@ -440,14 +444,16 @@ def show_home_page():
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
             st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+    else:
+        st.info("👈 Sube un archivo CSV y procésalo para ver los datos")
 
 def show_cleaning_page():
     st.markdown('<h1 class="main-header">🔄 Limpieza de Datos</h1>', unsafe_allow_html=True)
     
-    if 'df_clean' in st.session_state and 'transformations' in st.session_state:
+    if st.session_state.df_clean is not None and st.session_state.transformations:
         df = st.session_state.df_clean
         transformations = st.session_state.transformations
-        df_original = st.session_state.df_original
+        df_original = st.session_state.df_original if st.session_state.df_original is not None else df
         
         # Resumen de transformaciones
         st.markdown('<h3 class="sub-header">📋 Transformaciones Aplicadas</h3>', unsafe_allow_html=True)
@@ -463,13 +469,13 @@ def show_cleaning_page():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.write("**Datos Originales**")
+            st.write("**Datos Originales (muestra)**")
             st.dataframe(df_original.head(), use_container_width=True)
             st.write(f"Registros: {len(df_original):,}")
             st.write(f"Valores nulos: {df_original.isnull().sum().sum():,}")
         
         with col2:
-            st.write("**Datos Limpios**")
+            st.write("**Datos Limpios (muestra)**")
             st.dataframe(df.head(), use_container_width=True)
             st.write(f"Registros: {len(df):,}")
             st.write(f"Valores nulos: {df.isnull().sum().sum():,}")
@@ -486,11 +492,13 @@ def show_cleaning_page():
             "text/csv",
             key='download-csv'
         )
+    else:
+        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
 def show_business_analysis_page():
     st.markdown('<h1 class="main-header">📈 Análisis de Negocio</h1>', unsafe_allow_html=True)
     
-    if 'df_clean' in st.session_state:
+    if st.session_state.df_clean is not None:
         df = st.session_state.df_clean
         
         # Pregunta 1: Rentabilidad por categoría
@@ -531,11 +539,12 @@ def show_business_analysis_page():
                 st.plotly_chart(fig, use_container_width=True)
             
             # Insights
-            st.info(f"""
-            **💡 Insights:**
-            - Categoría con mayor ingreso: **{category_analysis.index[0]}** (${category_analysis.iloc[0]['ingreso_total']:,.0f})
-            - Categoría con menor rentabilidad: **{category_analysis.sort_values('rentabilidad').index[0]}** (${category_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']:,.2f} por transacción)
-            """)
+            if not category_analysis.empty:
+                st.info(f"""
+                **💡 Insights:**
+                - Categoría con mayor ingreso: **{category_analysis.index[0]}** (${category_analysis.iloc[0]['ingreso_total']:,.0f})
+                - Categoría con menor rentabilidad: **{category_analysis.sort_values('rentabilidad').index[0]}** (${category_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']:,.2f} por transacción)
+                """)
         
         # Pregunta 2: Segmentos de clientes
         st.markdown("---")
@@ -587,11 +596,13 @@ def show_business_analysis_page():
                             color=analysis.index
                         )
                         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
 def show_visualizations_page():
     st.markdown('<h1 class="main-header">📊 Visualizaciones</h1>', unsafe_allow_html=True)
     
-    if 'df_clean' in st.session_state:
+    if st.session_state.df_clean is not None:
         df = st.session_state.df_clean
         
         # Seleccionar tipo de visualización
@@ -717,11 +728,13 @@ def show_visualizations_page():
                         labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
                     )
                     st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
 def show_kpis_page():
     st.markdown('<h1 class="main-header">📋 Panel de KPIs</h1>', unsafe_allow_html=True)
     
-    if 'df_clean' in st.session_state:
+    if st.session_state.df_clean is not None:
         df = st.session_state.df_clean
         
         # KPIs principales
@@ -754,8 +767,7 @@ def show_kpis_page():
         
         if 'category' in df.columns:
             category_kpis = df.groupby('category').agg({
-                'total_spent': ['sum', 'mean', 'count'],
-                'quantity': 'sum' if 'quantity' in df.columns else None
+                'total_spent': ['sum', 'mean', 'count']
             }).round(2)
             
             if category_kpis.columns.nlevels > 1:
@@ -771,24 +783,28 @@ def show_kpis_page():
             # Últimos 30 días vs período anterior
             df_temp = df.copy()
             df_temp['date'] = df_temp['transaction_date'].dt.date
-            latest_date = df_temp['date'].max()
             
-            last_30_days = latest_date - pd.Timedelta(days=30)
-            previous_30_days = last_30_days - pd.Timedelta(days=30)
-            
-            sales_last_30 = df_temp[df_temp['date'] >= last_30_days]['total_spent'].sum()
-            sales_previous_30 = df_temp[(df_temp['date'] >= previous_30_days) & 
-                                       (df_temp['date'] < last_30_days)]['total_spent'].sum()
-            
-            growth = ((sales_last_30 - sales_previous_30) / sales_previous_30 * 100) if sales_previous_30 > 0 else 0
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.metric("💰 Ventas últimos 30 días", f"${sales_last_30:,.0f}")
-            
-            with col2:
-                st.metric("📈 Crecimiento vs período anterior", f"{growth:.1f}%")
+            if len(df_temp) > 0:
+                latest_date = df_temp['date'].max()
+                
+                last_30_days = latest_date - pd.Timedelta(days=30)
+                previous_30_days = last_30_days - pd.Timedelta(days=30)
+                
+                sales_last_30 = df_temp[df_temp['date'] >= last_30_days]['total_spent'].sum()
+                sales_previous_30 = df_temp[(df_temp['date'] >= previous_30_days) & 
+                                           (df_temp['date'] < last_30_days)]['total_spent'].sum()
+                
+                growth = ((sales_last_30 - sales_previous_30) / sales_previous_30 * 100) if sales_previous_30 > 0 else 0
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("💰 Ventas últimos 30 días", f"${sales_last_30:,.0f}")
+                
+                with col2:
+                    st.metric("📈 Crecimiento vs período anterior", f"{growth:.1f}%")
+    else:
+        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
 
 # =====================================================
 # EJECUCIÓN PRINCIPAL
