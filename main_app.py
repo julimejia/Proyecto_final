@@ -982,7 +982,7 @@ Responde en español, de forma clara, ejecutiva y estructurada.
     url = "https://api.groq.com/openai/v1/chat/completions"
 
     payload = {
-        "model": "llama3-70b-8192",
+        "model": "mixtral-8x7b-32768",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3
     }
@@ -1015,8 +1015,8 @@ def show_ai_insights_page():
     """)
 
     with st.expander("⚙️ Configuración de IA", expanded=True):
-        st.write("La clave API se obtiene desde `st.secrets` (no hardcodeada).")
-        st.write("Modelo: **LLaMA 3 – 70B**")
+        st.write("La clave API se obtiene desde `st.session_state` (no hardcodeada).")
+        st.write("Modelo: **Mixtral 8x7B**")
 
     if st.button("🚀 Generar Insights con IA", type="primary"):
         with st.spinner("Analizando datos y generando insights..."):
