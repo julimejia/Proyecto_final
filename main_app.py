@@ -196,42 +196,99 @@ def analyze_category_profitability(df):
 
 def analyze_customer_segments(df):
     """Analiza segmentos de clientes (Pregunta 2)"""
+    
     results = {}
     
-    # Análisis por ubicación
+    # ==============================
+    # MÉTRICAS GLOBALES
+    # ==============================
+    if 'total_spent' in df.columns:
+        total_ventas = df['total_spent'].sum()
+        total_tickets = df.shape[0]
+        ticket_promedio_global = df['total_spent'].mean()
+        
+        results['metricas_globales'] = {
+            'ventas_totales': round(total_ventas, 2),
+            'total_tickets': int(total_tickets),
+            'ticket_promedio_global': round(ticket_promedio_global, 2)
+        }
+    
+    # ==============================
+    # ANÁLISIS POR UBICACIÓN
+    # ==============================
     if 'location' in df.columns and 'total_spent' in df.columns:
+        
         location_analysis = df.groupby('location').agg({
             'total_spent': ['mean', 'sum', 'count']
         }).round(2)
         
         if location_analysis.columns.nlevels > 1:
-            location_analysis.columns = ['_'.join(col).strip('_') for col in location_analysis.columns.values]
+            location_analysis.columns = [
+                '_'.join(col).strip('_') 
+                for col in location_analysis.columns.values
+            ]
         
-        results['ubicacion'] = location_analysis.sort_values('total_spent_mean', ascending=False)
+        # Participación porcentual
+        if 'total_spent_sum' in location_analysis.columns:
+            location_analysis['participacion_%'] = (
+                location_analysis['total_spent_sum'] / total_ventas * 100
+            ).round(2)
+        
+        results['ubicacion'] = location_analysis.sort_values(
+            'total_spent_mean', ascending=False
+        )
     
-    # Análisis por método de pago
+    # ==============================
+    # ANÁLISIS POR MÉTODO DE PAGO
+    # ==============================
     if 'payment_method' in df.columns and 'total_spent' in df.columns:
+        
         payment_analysis = df.groupby('payment_method').agg({
             'total_spent': ['mean', 'sum', 'count']
         }).round(2)
         
         if payment_analysis.columns.nlevels > 1:
-            payment_analysis.columns = ['_'.join(col).strip('_') for col in payment_analysis.columns.values]
+            payment_analysis.columns = [
+                '_'.join(col).strip('_') 
+                for col in payment_analysis.columns.values
+            ]
         
-        results['metodo_pago'] = payment_analysis.sort_values('total_spent_mean', ascending=False)
+        if 'total_spent_sum' in payment_analysis.columns:
+            payment_analysis['participacion_%'] = (
+                payment_analysis['total_spent_sum'] / total_ventas * 100
+            ).round(2)
+        
+        results['metodo_pago'] = payment_analysis.sort_values(
+            'total_spent_mean', ascending=False
+        )
     
-    # Análisis por categoría comprada
+    # ==============================
+    # ANÁLISIS POR CATEGORÍA
+    # ==============================
     if 'category' in df.columns and 'total_spent' in df.columns:
+        
         category_analysis = df.groupby('category').agg({
             'total_spent': ['mean', 'sum', 'count']
         }).round(2)
         
         if category_analysis.columns.nlevels > 1:
-            category_analysis.columns = ['_'.join(col).strip('_') for col in category_analysis.columns.values]
+            category_analysis.columns = [
+                '_'.join(col).strip('_') 
+                for col in category_analysis.columns.values
+            ]
         
-        results['categoria'] = category_analysis.sort_values('total_spent_mean', ascending=False)
+        # Participación porcentual
+        if 'total_spent_sum' in category_analysis.columns:
+            category_analysis['participacion_%'] = (
+                category_analysis['total_spent_sum'] / total_ventas * 100
+            ).round(2)
+        
+        results['categoria'] = category_analysis.sort_values(
+            'total_spent_sum', ascending=False
+        )
     
     return results
+
 
 
 def analyze_temporal_patterns(df):
