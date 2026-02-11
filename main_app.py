@@ -937,9 +937,9 @@ def generate_ai_insights(df):
     """
     Genera insights usando Groq LLM basado en estadísticas del dataset
     """
-    api_key = st.secrets.get("GROQ_API_KEY", None)
+    api_key = st.session_state.get("groq_api_key", None)    
     if api_key is None:
-        raise ValueError("No se encontró GROQ_API_KEY en st.secrets")
+        raise ValueError("No se encontró GROQ_API_KEY en st.session_state")
 
     # Resumen estadístico
     describe = df.describe().round(2).to_string()
