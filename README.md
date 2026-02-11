@@ -115,20 +115,6 @@ Puedes utilizar cualquier dataset de ventas retail que contenga al menos las sig
 
 Un dataset recomendado para pruebas es el [Retail Store Sales (dirty) de Kaggle](https://www.kaggle.com/datasets/ahmedmohamed2003/retail-store-sales-dirty-for-data-cleaning). El dashboard incluye una limpieza automática adaptada a este formato.
 
----
-
-## 📸 Capturas de pantalla
-
-*(Opcional: incluye aquí algunas imágenes del dashboard en funcionamiento)*
-
----
-
-## 🧰 Personalización
-
-Si deseas adaptar el dashboard a otro tipo de datos, modifica las funciones de limpieza (`clean_retail_data`) y análisis (`analyze_category_profitability`, `analyze_customer_segments`, `analyze_temporal_patterns`) según la estructura de tu dataset.
-
----
-
 ## 📄 Licencia
 
 Este proyecto fue desarrollado con fines académicos para el curso **Fundamentos en Ciencia de Datos** de la **Universidad EAFIT**. Queda bajo la licencia [MIT](LICENSE).
@@ -150,3 +136,4 @@ Si encuentras algún error o tienes sugerencias, por favor abre un **issue** en 
 
 ¡Disfruta analizando tus datos! 🚀
 ```
+
