@@ -129,11 +129,3 @@ Este proyecto fue desarrollado con fines académicos para el curso **Fundamentos
 Periodo 2026-1
 
 ---
-
-## 🙋‍♂️ Soporte
-
-Si encuentras algún error o tienes sugerencias, por favor abre un **issue** en el repositorio o contacta a los autores.
-
-¡Disfruta analizando tus datos! 🚀
-```
-
