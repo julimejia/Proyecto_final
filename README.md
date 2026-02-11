@@ -115,7 +115,21 @@ Este proyecto fue desarrollado con fines académicos para el curso **Fundamentos
 - **Juan Andrés Montoya**
 - **Julián David Mejía**
 
+
+🙏 CRÉDITOS Y AGRADECIMIENTOS
+
+Este proyecto no habría sido posible sin el valioso trabajo y la inspiración de la comunidad de Kaggle.
+
+- Notebook de referencia: El proceso de limpieza de datos y feature engineering está basado en el enfoque desarrollado en el notebook "Karnyxel is trying to clean the the dataset" (https://www.kaggle.com/code/kashifali68/karnyxel-is-trying-to-clean-the-the-dataset).
+
+- Autor del código: Un agradecimiento especial a Kashif Ali (kashifali68) por publicar y compartir este detallado tutorial.
+
+- Inspiración original: Extendemos nuestro reconocimiento a Karnyxel, cuya metodología y paso a paso para la limpieza de datos retail fueron seguidos e implementados en este dashboard.
+
+Gracias por compartir conocimiento y contribuir al crecimiento de la comunidad. 🚀
+
 Periodo 2026-1
 
 ---
+
 
