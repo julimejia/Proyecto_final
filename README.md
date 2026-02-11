@@ -36,7 +36,7 @@ Además, incluye una sección de **insights con IA** mediante la API de Groq (mo
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/dashboard-retail-inteligente.git
+git clone [https://github.com/tu-usuario/dashboard-retail-inteligente.git](https://github.com/julimejia/Proyecto_final.git)
 cd dashboard-retail-inteligente
 ```
 
@@ -102,17 +102,6 @@ Una vez configurada, podrás usar la pestaña **"🤖 Insights IA"** para genera
 
 ---
 
-## 🧪 Datos de ejemplo
-
-Puedes utilizar cualquier dataset de ventas retail que contenga al menos las siguientes columnas (nombres en inglés):
-
-- `Transaction Date` (fecha)
-- `Total Spent` (monto gastado)
-- `Category` (categoría del producto)
-- `Location` (ubicación de la tienda)
-- `Payment Method` (método de pago)
-- `Quantity` (cantidad de unidades, opcional)
-
 Un dataset recomendado para pruebas es el [Retail Store Sales (dirty) de Kaggle](https://www.kaggle.com/datasets/ahmedmohamed2003/retail-store-sales-dirty-for-data-cleaning). El dashboard incluye una limpieza automática adaptada a este formato.
 
 ## 📄 Licencia
@@ -129,3 +118,4 @@ Este proyecto fue desarrollado con fines académicos para el curso **Fundamentos
 Periodo 2026-1
 
 ---
+
