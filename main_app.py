@@ -169,6 +169,44 @@ def clean_retail_data(df):
 # =====================================================
 # ANÁLISIS PARA PREGUNTAS DE NEGOCIO
 # =====================================================
+def analyze_customer_segments(df):
+        """
+        Analiza segmentación básica de clientes por:
+        - Ubicación
+        - Método de pago
+        - Ticket promedio
+        """
+
+        if df is None or df.empty:
+            return {}
+
+        required_cols = ["Total Spent", "Location", "Payment Method"]
+
+        for col in required_cols:
+            if col not in df.columns:
+                return {}
+
+        segment_data = {}
+
+        # Ticket promedio por ubicación
+        location_ticket = (
+            df.groupby("Location")["Total Spent"]
+            .mean()
+            .sort_values(ascending=False)
+        )
+
+        # Ticket promedio por método de pago
+        payment_ticket = (
+            df.groupby("Payment Method")["Total Spent"]
+            .mean()
+            .sort_values(ascending=False)
+        )
+
+        segment_data["location_ticket"] = location_ticket
+        segment_data["payment_ticket"] = payment_ticket
+
+        return segment_data
+
 def analyze_category_profitability(df):
     """Analiza rentabilidad por categoría (Pregunta 1)"""
     if "category" not in df.columns or "total_spent" not in df.columns:
@@ -205,14 +243,24 @@ def generate_business_metrics(df):
         "total_revenue": df["Total Spent"].sum(),
     }
 
-def show_business_analysis_page(df):
+st.subheader("2️⃣ ¿Qué segmentos tienen el ticket promedio más alto?")
 
-    st.title("📊 Business Analysis")
+segment_analysis = analyze_customer_segments(df)
 
-    if df is None or df.empty:
-        st.warning("No data available for analysis.")
-        return
+if not segment_analysis.empty:
 
+    st.dataframe(segment_analysis.head(10))
+
+    top_segments = segment_analysis.head(5)
+
+    st.bar_chart(
+        top_segments.set_index(
+            top_segments["Location"] + " | " + top_segments["Payment Method"]
+        )["avg_ticket"]
+    )
+
+else:
+    st.info("No segment data available.")
     # ==============================
     # GENERAR MÉTRICAS DE NEGOCIO
     # ==============================
@@ -716,44 +764,7 @@ def show_business_analysis_page():
         st.markdown("---")
         st.markdown('<h3 class="sub-header">2️⃣ ¿Qué segmentos de clientes tienen el ticket promedio más alto?</h3>', unsafe_allow_html=True)
         
-        def analyze_customer_segments(df):
-                    """
-                    Analiza segmentación básica de clientes por:
-                    - Ubicación
-                    - Método de pago
-                    - Ticket promedio
-                    """
-
-                    if df is None or df.empty:
-                        return {}
-
-                    required_cols = ["Total Spent", "Location", "Payment Method"]
-
-                    for col in required_cols:
-                        if col not in df.columns:
-                            return {}
-
-                    segment_data = {}
-
-                    # Ticket promedio por ubicación
-                    location_ticket = (
-                        df.groupby("Location")["Total Spent"]
-                        .mean()
-                        .sort_values(ascending=False)
-                    )
-
-                    # Ticket promedio por método de pago
-                    payment_ticket = (
-                        df.groupby("Payment Method")["Total Spent"]
-                        .mean()
-                        .sort_values(ascending=False)
-                    )
-
-                    segment_data["location_ticket"] = location_ticket
-                    segment_data["payment_ticket"] = payment_ticket
-
-                    return segment_data
-
+       
         
         segment_analysis = analyze_customer_segments(df)
         
