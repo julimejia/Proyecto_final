@@ -194,100 +194,150 @@ def analyze_category_profitability(df):
     return analysis.sort_values('ingreso_total', ascending=False)
 
 
-def analyze_customer_segments(df):
-    """Analiza segmentos de clientes (Pregunta 2)"""
-    
-    results = {}
-    
+def generate_business_metrics(df):
+
+    if df is None or df.empty:
+        return {}
+
+    return {
+        "total_spent_mean": df["Total Spent"].mean(),
+        "total_transactions": len(df),
+        "total_revenue": df["Total Spent"].sum(),
+    }
+
+def show_business_analysis_page(df):
+
+    st.title("📊 Business Analysis")
+
+    if df is None or df.empty:
+        st.warning("No data available for analysis.")
+        return
+
     # ==============================
-    # MÉTRICAS GLOBALES
+    # GENERAR MÉTRICAS DE NEGOCIO
     # ==============================
-    if 'total_spent' in df.columns:
-        total_ventas = df['total_spent'].sum()
-        total_tickets = df.shape[0]
-        ticket_promedio_global = df['total_spent'].mean()
-        
-        results['metricas_globales'] = {
-            'ventas_totales': round(total_ventas, 2),
-            'total_tickets': int(total_tickets),
-            'ticket_promedio_global': round(ticket_promedio_global, 2)
-        }
-    
+
+    analysis = generate_business_metrics(df)
+
+    st.subheader("📌 Key Metrics")
+
+    col1, col2, col3 = st.columns(3)
+
+    # ==========================================
+    # CASO 1: analysis es un diccionario
+    # ==========================================
+    if isinstance(analysis, dict):
+
+        total_spent_mean = analysis.get("total_spent_mean")
+        total_transactions = analysis.get("total_transactions")
+        total_revenue = analysis.get("total_revenue")
+
+        if total_spent_mean is not None:
+            col1.metric("Average Ticket", f"${total_spent_mean:,.2f}")
+
+        if total_transactions is not None:
+            col2.metric("Total Transactions", f"{total_transactions:,}")
+
+        if total_revenue is not None:
+            col3.metric("Total Revenue", f"${total_revenue:,.2f}")
+
+    # ==========================================
+    # CASO 2: analysis es DataFrame
+    # ==========================================
+    elif isinstance(analysis, pd.DataFrame):
+
+        if 'total_spent_mean' in analysis.columns:
+            col1.metric(
+                "Average Ticket",
+                f"${analysis['total_spent_mean'].iloc[0]:,.2f}"
+            )
+
+        if 'total_transactions' in analysis.columns:
+            col2.metric(
+                "Total Transactions",
+                f"{int(analysis['total_transactions'].iloc[0]):,}"
+            )
+
+        if 'total_revenue' in analysis.columns:
+            col3.metric(
+                "Total Revenue",
+                f"${analysis['total_revenue'].iloc[0]:,.2f}"
+            )
+
+    else:
+        st.warning("Unexpected analysis data format.")
+
     # ==============================
-    # ANÁLISIS POR UBICACIÓN
+    # CATEGORY ANALYSIS
     # ==============================
-    if 'location' in df.columns and 'total_spent' in df.columns:
-        
-        location_analysis = df.groupby('location').agg({
-            'total_spent': ['mean', 'sum', 'count']
-        }).round(2)
-        
-        if location_analysis.columns.nlevels > 1:
-            location_analysis.columns = [
-                '_'.join(col).strip('_') 
-                for col in location_analysis.columns.values
-            ]
-        
-        # Participación porcentual
-        if 'total_spent_sum' in location_analysis.columns:
-            location_analysis['participacion_%'] = (
-                location_analysis['total_spent_sum'] / total_ventas * 100
-            ).round(2)
-        
-        results['ubicacion'] = location_analysis.sort_values(
-            'total_spent_mean', ascending=False
+
+    st.subheader("📈 Revenue by Category")
+
+    if "Category" in df.columns and "Total Spent" in df.columns:
+
+        category_revenue = (
+            df.groupby("Category")["Total Spent"]
+            .sum()
+            .sort_values(ascending=False)
+            .reset_index()
         )
-    
+
+        if not category_revenue.empty:
+            st.bar_chart(
+                category_revenue.set_index("Category")
+            )
+        else:
+            st.info("No category data available.")
+
     # ==============================
-    # ANÁLISIS POR MÉTODO DE PAGO
+    # LOCATION ANALYSIS
     # ==============================
-    if 'payment_method' in df.columns and 'total_spent' in df.columns:
-        
-        payment_analysis = df.groupby('payment_method').agg({
-            'total_spent': ['mean', 'sum', 'count']
-        }).round(2)
-        
-        if payment_analysis.columns.nlevels > 1:
-            payment_analysis.columns = [
-                '_'.join(col).strip('_') 
-                for col in payment_analysis.columns.values
-            ]
-        
-        if 'total_spent_sum' in payment_analysis.columns:
-            payment_analysis['participacion_%'] = (
-                payment_analysis['total_spent_sum'] / total_ventas * 100
-            ).round(2)
-        
-        results['metodo_pago'] = payment_analysis.sort_values(
-            'total_spent_mean', ascending=False
+
+    st.subheader("📍 Average Ticket by Location")
+
+    if "Location" in df.columns and "Total Spent" in df.columns:
+
+        location_ticket = (
+            df.groupby("Location")["Total Spent"]
+            .mean()
+            .sort_values(ascending=False)
+            .reset_index()
         )
-    
+
+        if not location_ticket.empty:
+            st.bar_chart(
+                location_ticket.set_index("Location")
+            )
+        else:
+            st.info("No location data available.")
+
     # ==============================
-    # ANÁLISIS POR CATEGORÍA
+    # TEMPORAL ANALYSIS
     # ==============================
-    if 'category' in df.columns and 'total_spent' in df.columns:
-        
-        category_analysis = df.groupby('category').agg({
-            'total_spent': ['mean', 'sum', 'count']
-        }).round(2)
-        
-        if category_analysis.columns.nlevels > 1:
-            category_analysis.columns = [
-                '_'.join(col).strip('_') 
-                for col in category_analysis.columns.values
-            ]
-        
-        # Participación porcentual
-        if 'total_spent_sum' in category_analysis.columns:
-            category_analysis['participacion_%'] = (
-                category_analysis['total_spent_sum'] / total_ventas * 100
-            ).round(2)
-        
-        results['categoria'] = category_analysis.sort_values(
-            'total_spent_sum', ascending=False
+
+    st.subheader("📅 Monthly Revenue Trend")
+
+    if "Transaction Date" in df.columns:
+
+        df["Transaction Date"] = pd.to_datetime(
+            df["Transaction Date"], errors="coerce"
         )
-    
-    return results
+
+        df["Month"] = df["Transaction Date"].dt.to_period("M")
+
+        monthly_revenue = (
+            df.groupby("Month")["Total Spent"]
+            .sum()
+            .reset_index()
+        )
+
+        if not monthly_revenue.empty:
+            monthly_revenue["Month"] = monthly_revenue["Month"].astype(str)
+            st.line_chart(
+                monthly_revenue.set_index("Month")
+            )
+        else:
+            st.info("No temporal data available.")
 
 
 
