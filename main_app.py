@@ -13,9 +13,8 @@ import json
 
 warnings.filterwarnings('ignore')
 
-# Configuración de página
 st.set_page_config(
-    page_title="Dashboard Retail Inteligente", 
+    page_title="Dashboard Retail Inteligente",
     layout="wide",
     page_icon="📊"
 )
@@ -62,7 +61,6 @@ st.markdown("""
 # =====================================================
 @st.cache_data
 def load_file(file):
-    """Carga archivo CSV con caché"""
     try:
         df = pd.read_csv(file)
         return df
@@ -72,434 +70,191 @@ def load_file(file):
 
 
 # =====================================================
-# LIMPIEZA DE DATOS (SIMPLIFICADA Y EFECTIVA)
+# LIMPIEZA DE DATOS (basada en el notebook)
 # =====================================================
 def clean_retail_data(df):
-    """
-    Limpieza de datos retail basada en el enfoque del notebook
-    """
     transformations = []
     df_original = df.copy()
-    
-    # 1. ANÁLISIS INICIAL
     initial_rows = len(df)
     initial_cols = len(df.columns)
-    transformations.append(f"📊 **ANÁLISIS INICIAL:** {initial_rows:,} registros, {initial_cols} columnas")
-    
-    # 2. ELIMINAR COLUMNAS INNECESARIAS
-    columns_to_drop = []
+    transformations.append(f"📊 **INICIO:** {initial_rows:,} registros, {initial_cols} columnas")
+
+    # Eliminar columnas innecesarias
+    cols_to_drop = []
     if 'Transaction ID' in df.columns:
-        columns_to_drop.append('Transaction ID')
+        cols_to_drop.append('Transaction ID')
     if 'Item' in df.columns:
-        columns_to_drop.append('Item')
-    
-    if columns_to_drop:
-        df = df.drop(columns=columns_to_drop)
-        transformations.append(f"🗑️ **Columnas eliminadas:** {', '.join(columns_to_drop)}")
-    
-    # 3. NORMALIZAR NOMBRES DE COLUMNAS
+        cols_to_drop.append('Item')
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+        transformations.append(f"🗑️ Eliminadas: {', '.join(cols_to_drop)}")
+
+    # Normalizar nombres a snake_case
     df.columns = df.columns.str.lower().str.replace(' ', '_', regex=True)
-    transformations.append("🔄 **Columnas convertidas a snake_case**")
-    
-    # 4. MANEJO DE VALORES FALTANTES
-    transformations.append("\n🔍 **MANEJO DE VALORES FALTANTES:**")
-    
-    # Rellenar discount_applied con 0
+    transformations.append("🔄 Nombres en snake_case")
+
+    # Manejo de valores faltantes
+    transformations.append("\n🔍 **VALORES FALTANTES:**")
     if 'discount_applied' in df.columns:
-        missing_discount = df['discount_applied'].isnull().sum()
+        miss = df['discount_applied'].isnull().sum()
         df['discount_applied'] = df['discount_applied'].fillna(0).astype(int)
-        transformations.append(f"   • discount_applied: {missing_discount:,} valores nulos rellenados con 0")
-    
-    # Eliminar filas con otros valores nulos
+        transformations.append(f"   • discount_applied: {miss} nulos → 0")
+
     missing_before = df.isnull().sum().sum()
     df = df.dropna()
     missing_after = df.isnull().sum().sum()
-    rows_removed = missing_before - missing_after
-    transformations.append(f"   • Eliminadas {rows_removed:,} filas con valores nulos")
-    
-    # 5. CONVERSIÓN DE TIPOS DE DATOS
-    transformations.append("\n🔄 **CONVERSIÓN DE TIPOS DE DATOS:**")
-    
-    # Convertir columnas categóricas
-    categorical_cols = ['category', 'payment_method', 'location']
-    for col in categorical_cols:
+    transformations.append(f"   • Filas eliminadas por nulos: {missing_before - missing_after}")
+
+    # Conversión de tipos
+    transformations.append("\n🔄 **TIPOS DE DATOS:**")
+    cat_cols = ['category', 'payment_method', 'location']
+    for col in cat_cols:
         if col in df.columns:
             df[col] = df[col].astype('category')
-            transformations.append(f"   • {col}: convertida a category")
-    
-    # Convertir fecha
+            transformations.append(f"   • {col} → category")
+
     if 'transaction_date' in df.columns:
         df['transaction_date'] = pd.to_datetime(df['transaction_date'], errors='coerce')
-        # Eliminar fechas inválidas
-        invalid_dates = df['transaction_date'].isnull().sum()
-        if invalid_dates > 0:
+        inv = df['transaction_date'].isnull().sum()
+        if inv > 0:
             df = df.dropna(subset=['transaction_date'])
-            transformations.append(f"   • transaction_date: {invalid_dates:,} fechas inválidas eliminadas")
-    
-    # Asegurar tipos numéricos
-    numeric_cols = ['quantity', 'price_per_unit', 'total_spent']
-    for col in numeric_cols:
+            transformations.append(f"   • transaction_date: {inv} fechas inválidas eliminadas")
+
+    num_cols = ['quantity', 'price_per_unit', 'total_spent']
+    for col in num_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    # 6. FEATURE ENGINEERING BÁSICO
+
+    # Feature engineering temporal
     transformations.append("\n⚙️ **FEATURE ENGINEERING:**")
-    
     if 'transaction_date' in df.columns:
-        # Extraer características temporales
         df['year'] = df['transaction_date'].dt.year
         df['month'] = df['transaction_date'].dt.month
         df['day'] = df['transaction_date'].dt.day
         df['weekday'] = df['transaction_date'].dt.day_name()
         df['month_name'] = df['transaction_date'].dt.month_name()
-        transformations.append("   • Características temporales extraídas (año, mes, día, día de semana)")
-    
-    # 7. VALIDACIONES FINALES
+        transformations.append("   • Año, mes, día, día_semana, mes_nombre")
+
     final_rows = len(df)
-    rows_removed_total = initial_rows - final_rows
-    
-    transformations.append(f"\n✅ **RESULTADO FINAL:**")
-    transformations.append(f"   • Registros finales: {final_rows:,}")
-    transformations.append(f"   • Registros eliminados: {rows_removed_total:,} ({rows_removed_total/initial_rows*100:.1f}%)")
-    transformations.append(f"   • Valores faltantes restantes: {df.isnull().sum().sum():,}")
-    
+    transformations.append(f"\n✅ **FINAL:** {final_rows:,} registros ({initial_rows-final_rows} eliminados, {((initial_rows-final_rows)/initial_rows*100):.1f}%)")
     return df, df_original, transformations
 
 
 # =====================================================
-# ANÁLISIS PARA PREGUNTAS DE NEGOCIO
+# ANÁLISIS DE NEGOCIO (preguntas 1,2,3)
 # =====================================================
-def analyze_customer_segments(df):
-        """
-        Analiza segmentación básica de clientes por:
-        - Ubicación
-        - Método de pago
-        - Ticket promedio
-        """
-
-        if df is None or df.empty:
-            return {}
-
-        required_cols = ["Total Spent", "Location", "Payment Method"]
-
-        for col in required_cols:
-            if col not in df.columns:
-                return {}
-
-        segment_data = {}
-
-        # Ticket promedio por ubicación
-        location_ticket = (
-            df.groupby("Location")["Total Spent"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-
-        # Ticket promedio por método de pago
-        payment_ticket = (
-            df.groupby("Payment Method")["Total Spent"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-
-        segment_data["location_ticket"] = location_ticket
-        segment_data["payment_ticket"] = payment_ticket
-
-        return segment_data
-
 def analyze_category_profitability(df):
-    """Analiza rentabilidad por categoría (Pregunta 1)"""
-    if "category" not in df.columns or "total_spent" not in df.columns:
+    """Pregunta 1: Ingreso y rentabilidad por categoría"""
+    if 'category' not in df.columns or 'total_spent' not in df.columns:
         return None
-    
-    analysis = df.groupby("category").agg({
-        "total_spent": ["sum", "mean", "count"]
-    }).round(2)
-    
-    # Aplanar columnas multi-index
-    analysis.columns = ['_'.join(col).strip('_') for col in analysis.columns.values]
-    
-    # Renombrar columnas para claridad
-    analysis = analysis.rename(columns={
-        'total_spent_sum': 'ingreso_total',
-        'total_spent_mean': 'ticket_promedio',
-        'total_spent_count': 'transacciones'
-    })
-    
-    # Calcular rentabilidad (ingreso por transacción)
-    analysis['rentabilidad'] = (analysis['ingreso_total'] / analysis['transacciones']).round(2)
-    
-    return analysis.sort_values('ingreso_total', ascending=False)
+    agg = df.groupby('category').agg(
+        ingreso_total=('total_spent', 'sum'),
+        ticket_promedio=('total_spent', 'mean'),
+        transacciones=('total_spent', 'count')
+    ).round(2)
+    agg['rentabilidad'] = (agg['ingreso_total'] / agg['transacciones']).round(2)
+    return agg.sort_values('ingreso_total', ascending=False)
 
 
-def generate_business_metrics(df):
+def analyze_customer_segments(df):
+    """
+    Pregunta 2: Segmentos de clientes con mayor ticket promedio.
+    Retorna dict con DataFrames: ubicación, método_pago, categoría.
+    """
+    results = {}
+    if 'location' in df.columns and 'total_spent' in df.columns:
+        loc = df.groupby('location')['total_spent'].mean().round(2).reset_index()
+        loc.columns = ['ubicacion', 'ticket_promedio']
+        results['ubicacion'] = loc.sort_values('ticket_promedio', ascending=False)
 
-    if df is None or df.empty:
-        return {}
+    if 'payment_method' in df.columns and 'total_spent' in df.columns:
+        pay = df.groupby('payment_method')['total_spent'].mean().round(2).reset_index()
+        pay.columns = ['metodo_pago', 'ticket_promedio']
+        results['metodo_pago'] = pay.sort_values('ticket_promedio', ascending=False)
 
-    return {
-        "total_spent_mean": df["Total Spent"].mean(),
-        "total_transactions": len(df),
-        "total_revenue": df["Total Spent"].sum(),
-    }
+    if 'category' in df.columns and 'total_spent' in df.columns:
+        cat = df.groupby('category')['total_spent'].mean().round(2).reset_index()
+        cat.columns = ['categoria', 'ticket_promedio']
+        results['categoria'] = cat.sort_values('ticket_promedio', ascending=False)
 
-st.subheader("2️⃣ ¿Qué segmentos tienen el ticket promedio más alto?")
-
-segment_analysis = analyze_customer_segments(df)
-
-if not segment_analysis.empty:
-
-    st.dataframe(segment_analysis.head(10))
-
-    top_segments = segment_analysis.head(5)
-
-    st.bar_chart(
-        top_segments.set_index(
-            top_segments["Location"] + " | " + top_segments["Payment Method"]
-        )["avg_ticket"]
-    )
-
-else:
-    st.info("No segment data available.")
-    # ==============================
-    # GENERAR MÉTRICAS DE NEGOCIO
-    # ==============================
-
-    analysis = generate_business_metrics(df)
-
-    st.subheader("📌 Key Metrics")
-
-    col1, col2, col3 = st.columns(3)
-
-    # ==========================================
-    # CASO 1: analysis es un diccionario
-    # ==========================================
-    if isinstance(analysis, dict):
-
-        total_spent_mean = analysis.get("total_spent_mean")
-        total_transactions = analysis.get("total_transactions")
-        total_revenue = analysis.get("total_revenue")
-
-        if total_spent_mean is not None:
-            col1.metric("Average Ticket", f"${total_spent_mean:,.2f}")
-
-        if total_transactions is not None:
-            col2.metric("Total Transactions", f"{total_transactions:,}")
-
-        if total_revenue is not None:
-            col3.metric("Total Revenue", f"${total_revenue:,.2f}")
-
-    # ==========================================
-    # CASO 2: analysis es DataFrame
-    # ==========================================
-    elif isinstance(analysis, pd.DataFrame):
-
-        if 'total_spent_mean' in analysis.columns:
-            col1.metric(
-                "Average Ticket",
-                f"${analysis['total_spent_mean'].iloc[0]:,.2f}"
-            )
-
-        if 'total_transactions' in analysis.columns:
-            col2.metric(
-                "Total Transactions",
-                f"{int(analysis['total_transactions'].iloc[0]):,}"
-            )
-
-        if 'total_revenue' in analysis.columns:
-            col3.metric(
-                "Total Revenue",
-                f"${analysis['total_revenue'].iloc[0]:,.2f}"
-            )
-
-    else:
-        st.warning("Unexpected analysis data format.")
-
-    # ==============================
-    # CATEGORY ANALYSIS
-    # ==============================
-
-    st.subheader("📈 Revenue by Category")
-
-    if "Category" in df.columns and "Total Spent" in df.columns:
-
-        category_revenue = (
-            df.groupby("Category")["Total Spent"]
-            .sum()
-            .sort_values(ascending=False)
-            .reset_index()
-        )
-
-        if not category_revenue.empty:
-            st.bar_chart(
-                category_revenue.set_index("Category")
-            )
-        else:
-            st.info("No category data available.")
-
-    # ==============================
-    # LOCATION ANALYSIS
-    # ==============================
-
-    st.subheader("📍 Average Ticket by Location")
-
-    if "Location" in df.columns and "Total Spent" in df.columns:
-
-        location_ticket = (
-            df.groupby("Location")["Total Spent"]
-            .mean()
-            .sort_values(ascending=False)
-            .reset_index()
-        )
-
-        if not location_ticket.empty:
-            st.bar_chart(
-                location_ticket.set_index("Location")
-            )
-        else:
-            st.info("No location data available.")
-
-    # ==============================
-    # TEMPORAL ANALYSIS
-    # ==============================
-
-    st.subheader("📅 Monthly Revenue Trend")
-
-    if "Transaction Date" in df.columns:
-
-        df["Transaction Date"] = pd.to_datetime(
-            df["Transaction Date"], errors="coerce"
-        )
-
-        df["Month"] = df["Transaction Date"].dt.to_period("M")
-
-        monthly_revenue = (
-            df.groupby("Month")["Total Spent"]
-            .sum()
-            .reset_index()
-        )
-
-        if not monthly_revenue.empty:
-            monthly_revenue["Month"] = monthly_revenue["Month"].astype(str)
-            st.line_chart(
-                monthly_revenue.set_index("Month")
-            )
-        else:
-            st.info("No temporal data available.")
-
+    return results
 
 
 def analyze_temporal_patterns(df):
-    """Analiza patrones temporales (Pregunta 3)"""
+    """Pregunta 3: Patrones temporales (día, mes, hora)"""
     results = {}
-    
-    if 'transaction_date' in df.columns and 'total_spent' in df.columns:
-        # Análisis por día de la semana
-        if 'weekday' in df.columns:
-            daily_pattern = df.groupby('weekday').agg({
-                'total_spent': ['sum', 'mean', 'count']
-            }).round(2)
-            
-            # Ordenar días
-            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            daily_pattern = daily_pattern.reindex(day_order)
-            
-            if daily_pattern.columns.nlevels > 1:
-                daily_pattern.columns = ['_'.join(col).strip('_') for col in daily_pattern.columns.values]
-            
-            results['dia_semana'] = daily_pattern
-        
-        # Análisis por mes
-        if 'month_name' in df.columns:
-            monthly_pattern = df.groupby('month_name').agg({
-                'total_spent': ['sum', 'mean', 'count']
-            }).round(2)
-            
-            # Ordenar meses
-            month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
-                         'July', 'August', 'September', 'October', 'November', 'December']
-            monthly_pattern = monthly_pattern.reindex([m for m in month_order if m in monthly_pattern.index])
-            
-            if monthly_pattern.columns.nlevels > 1:
-                monthly_pattern.columns = ['_'.join(col).strip('_') for col in monthly_pattern.columns.values]
-            
-            results['mes'] = monthly_pattern
-        
-        # Análisis por hora del día
-        if 'transaction_date' in df.columns:
-            df['hour'] = df['transaction_date'].dt.hour
-            hourly_pattern = df.groupby('hour').agg({
-                'total_spent': ['sum', 'mean', 'count']
-            }).round(2)
-            
-            if hourly_pattern.columns.nlevels > 1:
-                hourly_pattern.columns = ['_'.join(col).strip('_') for col in hourly_pattern.columns.values]
-            
-            results['hora'] = hourly_pattern
-    
+    if 'transaction_date' not in df.columns or 'total_spent' not in df.columns:
+        return results
+
+    # Día de semana
+    if 'weekday' in df.columns:
+        dia = df.groupby('weekday')['total_spent'].sum().round(2).reset_index()
+        dia.columns = ['dia_semana', 'ventas_totales']
+        orden = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        dia['dia_semana'] = pd.Categorical(dia['dia_semana'], categories=orden, ordered=True)
+        results['dia_semana'] = dia.sort_values('dia_semana')
+
+    # Mes
+    if 'month_name' in df.columns:
+        mes = df.groupby('month_name')['total_spent'].sum().round(2).reset_index()
+        mes.columns = ['mes', 'ventas_totales']
+        orden_meses = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December']
+        mes['mes'] = pd.Categorical(mes['mes'], categories=orden_meses, ordered=True)
+        results['mes'] = mes.sort_values('mes')
+
+    # Hora (copia local para no modificar df original)
+    df_hour = df.copy()
+    df_hour['hour'] = df_hour['transaction_date'].dt.hour
+    hora = df_hour.groupby('hour')['total_spent'].sum().round(2).reset_index()
+    hora.columns = ['hora', 'ventas_totales']
+    results['hora'] = hora.sort_values('hora')
+
     return results
 
 
 # =====================================================
-# VISUALIZACIONES SIMPLES Y CLARAS
+# VISUALIZACIONES (funciones auxiliares)
 # =====================================================
 def create_simple_bar_chart(df, x_col, y_col, title, color_col=None):
-    plot_data = df.reset_index() 
-
+    """Gráfico de barras simple con Plotly"""
     fig = px.bar(
-        plot_data,
+        df,
         x=x_col,
         y=y_col,
         color=color_col,
         title=title,
         text_auto=True
     )
-
     fig.update_layout(
         template="plotly_white",
-        xaxis_title=x_col.replace("_", " ").title(),
-        yaxis_title=y_col.replace("_", " ").title()
+        xaxis_title=x_col.replace('_', ' ').title(),
+        yaxis_title=y_col.replace('_', ' ').title()
     )
-
     return fig
 
 
 def create_box_plot(df, y_col, title):
-    """Crea box plot simple"""
     try:
-        fig = px.box(
-            df,
-            y=y_col,
-            title=title,
-            points="outliers"
-        )
-        fig.update_layout(
-            plot_bgcolor='white',
-            yaxis_title=y_col
-        )
+        fig = px.box(df, y=y_col, title=title, points="outliers")
+        fig.update_layout(plot_bgcolor='white', yaxis_title=y_col)
         return fig
     except Exception as e:
-        st.error(f"Error creando box plot: {str(e)}")
+        st.error(f"Error box plot: {e}")
         return None
 
 
 def create_heatmap(df, title):
-    """Crea mapa de calor de correlaciones"""
     try:
         numeric_df = df.select_dtypes(include=[np.number])
         if len(numeric_df.columns) > 1:
-            corr_matrix = numeric_df.corr()
-            fig = px.imshow(
-                corr_matrix,
-                title=title,
-                color_continuous_scale='RdBu',
-                text_auto='.2f',
-                aspect="auto"
-            )
+            corr = numeric_df.corr()
+            fig = px.imshow(corr, title=title, color_continuous_scale='RdBu',
+                            text_auto='.2f', aspect="auto")
             return fig
         return None
     except Exception as e:
-        st.error(f"Error creando heatmap: {str(e)}")
+        st.error(f"Error heatmap: {e}")
         return None
 
 
@@ -507,74 +262,53 @@ def create_heatmap(df, title):
 # INTERFAZ PRINCIPAL
 # =====================================================
 def main():
-    # Inicializar variables de sesión si no existen
-    if 'df_clean' not in st.session_state:
-        st.session_state.df_clean = None
-    if 'df_original' not in st.session_state:
-        st.session_state.df_original = None
-    if 'transformations' not in st.session_state:
-        st.session_state.transformations = []
-    
+    # Estado de sesión
+    for var in ['df_clean', 'df_original', 'transformations', 'groq_api_key', 'ai_insights']:
+        if var not in st.session_state:
+            st.session_state[var] = None if var != 'transformations' else []
+
     # Sidebar
     with st.sidebar:
         st.title("📊 Dashboard Retail")
         st.markdown("---")
-        
-        # Navegación
+
         page = st.radio(
-    "Navegación",
-    [
-        "🏠 Inicio",
-        "🔄 Limpieza",
-        "📈 Análisis Negocio",
-        "📊 Visualizaciones",
-        "📋 KPIs",
-        "🤖 Insights IA"
-    ]
-)
-        
-        # Carga de datos
+            "Navegación",
+            ["🏠 Inicio", "🔄 Limpieza", "📈 Análisis Negocio",
+             "📊 Visualizaciones", "📋 KPIs", "🤖 Insights IA"]
+        )
+
         st.markdown("---")
         st.subheader("📂 Carga de Datos")
         uploaded_file = st.file_uploader("Sube tu archivo CSV", type=['csv'])
 
-        
-        
         if uploaded_file:
             df = load_file(uploaded_file)
             if df is not None:
                 st.success(f"✅ {uploaded_file.name}")
                 st.info(f"📊 {len(df)} registros, {len(df.columns)} columnas")
-                
 
                 if st.button("🔄 Procesar Datos", type="primary"):
-                    with st.spinner("Limpiando y procesando datos..."):
-                        df_clean, df_original, transformations = clean_retail_data(df)
-                        st.session_state.df = df
+                    with st.spinner("Limpiando y procesando..."):
+                        df_clean, df_orig, trans = clean_retail_data(df)
                         st.session_state.df_clean = df_clean
-                        st.session_state.df_original = df_original
-                        st.session_state.transformations = transformations
+                        st.session_state.df_original = df_orig
+                        st.session_state.transformations = trans
                         st.success("✅ Datos procesados")
         else:
             st.info("👆 Sube un archivo CSV para comenzar")
 
         st.markdown("---")
         st.subheader("🤖 Configuración IA")
-
-        api_key_input = st.text_input(
-            "Groq API Key",
-            type="password",
-            help="Introduce tu API Key de Groq. No se almacenará permanentemente."
-        )
-
-        if api_key_input:
-            st.session_state.groq_api_key = api_key_input
-            st.success("API Key cargada correctamente ✅")
+        api_key = st.text_input("Groq API Key", type="password",
+                                help="Obtén tu API Key en console.groq.com")
+        if api_key:
+            st.session_state.groq_api_key = api_key
+            st.success("✅ API Key configurada")
         else:
-            if "groq_api_key" not in st.session_state:
-                st.session_state.groq_api_key = None
-    
+            st.session_state.groq_api_key = None
 
+    # Navegación de páginas
     if page == "🏠 Inicio":
         show_home_page()
     elif page == "🔄 Limpieza":
@@ -585,7 +319,7 @@ def main():
         show_visualizations_page()
     elif page == "📋 KPIs":
         show_kpis_page()
-    elif page == "🤖 Insights IA": 
+    elif page == "🤖 Insights IA":
         show_ai_insights_page()
 
 
@@ -594,59 +328,44 @@ def main():
 # =====================================================
 def show_home_page():
     st.markdown('<h1 class="main-header">🏠 Dashboard Retail Inteligente</h1>', unsafe_allow_html=True)
-    
-    if st.session_state.df_clean is not None:
-        df = st.session_state.df_clean
-        
-        # Métricas principales
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if 'total_spent' in df.columns:
-                total_sales = df['total_spent'].sum()
-                st.metric("💰 Ventas Totales", f"${total_sales:,.0f}")
-        
-        with col2:
-            if 'total_spent' in df.columns:
-                avg_ticket = df['total_spent'].mean()
-                st.metric("🎫 Ticket Promedio", f"${avg_ticket:,.2f}")
-        
-        with col3:
-            st.metric("📊 Transacciones", f"{len(df):,}")
-        
-        with col4:
-            if 'category' in df.columns:
-                unique_categories = df['category'].nunique()
-                st.metric("🏷️ Categorías", f"{unique_categories}")
-        
-        # Resumen del dataset
-        st.markdown("---")
-        st.markdown('<h2 class="sub-header">📋 Resumen del Dataset</h2>', unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Primeros registros:**")
-            st.dataframe(df.head(), use_container_width=True)
-        
-        with col2:
-            st.write("**Información de columnas:**")
-            info_df = pd.DataFrame({
-                'Columna': df.columns,
-                'Tipo': df.dtypes.values,
-                'No Nulos': df.notnull().sum().values
-            })
-            st.dataframe(info_df, use_container_width=True)
-        
-        # Descripción estadística
-        st.markdown("---")
-        st.markdown('<h2 class="sub-header">📊 Estadísticas Descriptivas</h2>', unsafe_allow_html=True)
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        if len(numeric_cols) > 0:
-            st.dataframe(df[numeric_cols].describe(), use_container_width=True)
-    else:
-        st.info("👈 Sube un archivo CSV y procésalo para ver los datos")
+    if st.session_state.df_clean is None:
+        st.info("👈 Sube y procesa un archivo CSV para comenzar")
+        return
+
+    df = st.session_state.df_clean
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if 'total_spent' in df.columns:
+            st.metric("💰 Ventas Totales", f"${df['total_spent'].sum():,.0f}")
+    with col2:
+        if 'total_spent' in df.columns:
+            st.metric("🎫 Ticket Promedio", f"${df['total_spent'].mean():,.2f}")
+    with col3:
+        st.metric("📊 Transacciones", f"{len(df):,}")
+    with col4:
+        if 'category' in df.columns:
+            st.metric("🏷️ Categorías", f"{df['category'].nunique()}")
+
+    st.markdown("---")
+    st.markdown('<h2 class="sub-header">📋 Resumen del Dataset</h2>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**Primeros registros**")
+        st.dataframe(df.head(), use_container_width=True)
+    with col2:
+        st.write("**Información de columnas**")
+        info = pd.DataFrame({
+            'Columna': df.columns,
+            'Tipo': df.dtypes.values,
+            'No Nulos': df.notnull().sum().values
+        })
+        st.dataframe(info, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown('<h2 class="sub-header">📊 Estadísticas Descriptivas</h2>', unsafe_allow_html=True)
+    numeric = df.select_dtypes(include=[np.number])
+    if not numeric.empty:
+        st.dataframe(numeric.describe(), use_container_width=True)
 
 
 # =====================================================
@@ -654,367 +373,196 @@ def show_home_page():
 # =====================================================
 def show_cleaning_page():
     st.markdown('<h1 class="main-header">🔄 Limpieza de Datos</h1>', unsafe_allow_html=True)
-    
-    if st.session_state.df_clean is not None and st.session_state.transformations:
-        df = st.session_state.df_clean
-        transformations = st.session_state.transformations
-        df_original = st.session_state.df_original if st.session_state.df_original is not None else df
-        
-        # Resumen de transformaciones
-        st.markdown('<h3 class="sub-header">📋 Transformaciones Aplicadas</h3>', unsafe_allow_html=True)
-        
-        with st.expander("Ver detalles de limpieza", expanded=True):
-            for transform in transformations:
-                st.write(transform)
-        
-        # Comparación
-        st.markdown("---")
-        st.markdown('<h3 class="sub-header">👁️ Comparación Antes/Después</h3>', unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Datos Originales (muestra)**")
-            st.dataframe(df_original.head(), use_container_width=True)
-            st.write(f"Registros: {len(df_original):,}")
-            st.write(f"Valores nulos: {df_original.isnull().sum().sum():,}")
-        
-        with col2:
-            st.write("**Datos Limpios (muestra)**")
-            st.dataframe(df.head(), use_container_width=True)
-            st.write(f"Registros: {len(df):,}")
-            st.write(f"Valores nulos: {df.isnull().sum().sum():,}")
-        
-        # Descarga de datos limpios
-        st.markdown("---")
-        st.markdown('<h3 class="sub-header">💾 Exportar Datos</h3>', unsafe_allow_html=True)
-        
-        csv = df.to_csv(index=False)
-        st.download_button(
-            "📥 Descargar CSV Limpio",
-            csv,
-            "datos_retail_limpios.csv",
-            "text/csv",
-            key='download-csv'
-        )
-    else:
-        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
+    if st.session_state.df_clean is None:
+        st.warning("⚠️ No hay datos procesados. Ve a Inicio y procesa un archivo.")
+        return
+
+    df = st.session_state.df_clean
+    trans = st.session_state.transformations
+    df_orig = st.session_state.df_original if st.session_state.df_original is not None else df
+
+    st.markdown('<h3 class="sub-header">📋 Transformaciones Aplicadas</h3>', unsafe_allow_html=True)
+    with st.expander("Ver detalles", expanded=True):
+        for t in trans:
+            st.write(t)
+
+    st.markdown("---")
+    st.markdown('<h3 class="sub-header">👁️ Comparación Antes/Después</h3>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**Datos Originales (muestra)**")
+        st.dataframe(df_orig.head(), use_container_width=True)
+        st.write(f"Registros: {len(df_orig):,}  |  Nulos: {df_orig.isnull().sum().sum():,}")
+    with col2:
+        st.write("**Datos Limpios (muestra)**")
+        st.dataframe(df.head(), use_container_width=True)
+        st.write(f"Registros: {len(df):,}  |  Nulos: {df.isnull().sum().sum():,}")
+
+    st.markdown("---")
+    st.markdown('<h3 class="sub-header">💾 Exportar Datos</h3>', unsafe_allow_html=True)
+    csv = df.to_csv(index=False)
+    st.download_button("📥 Descargar CSV Limpio", csv, "datos_retail_limpios.csv", "text/csv")
 
 
 # =====================================================
-# PÁGINA: ANÁLISIS DE NEGOCIO
+# PÁGINA: ANÁLISIS DE NEGOCIO (preguntas 1,2,3)
 # =====================================================
 def show_business_analysis_page():
     st.markdown('<h1 class="main-header">📈 Análisis de Negocio</h1>', unsafe_allow_html=True)
-    
-    if st.session_state.df_clean is not None:
-        df = st.session_state.df_clean
-        
-        # Pregunta 1: Rentabilidad por categoría
-        st.markdown('<h3 class="sub-header">1️⃣ ¿Qué categorías generan mayor ingreso y cuáles menor rentabilidad?</h3>', unsafe_allow_html=True)
-        
-        category_analysis = analyze_category_profitability(df)
-        
-        if category_analysis is not None:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("**Top 5 Categorías por Ingreso:**")
-                top_categories = category_analysis.head(5)
-                st.dataframe(top_categories, use_container_width=True)
-                
-                # Gráfico de barras
-                fig = create_simple_bar_chart(
-                                top_categories,
-                                'category',
-                                'ingreso_total',
-                                'Top 5 Categorías por Ingreso Total',
-                                color_col='category'
-                            )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.write("**Bottom 5 Categorías por Rentabilidad:**")
-                bottom_rentability = category_analysis.sort_values('rentabilidad').head(5)
-                st.dataframe(bottom_rentability, use_container_width=True)
-                
-                fig = create_simple_bar_chart(
-                        bottom_rentability,
-                        'category',
-                        'rentabilidad',
-                        'Bottom 5 Categorías por Rentabilidad',
-                        color_col='category'
-                    )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Insights
-            if not category_analysis.empty:
-                top_category = category_analysis.index[0]
-                top_income = category_analysis.iloc[0]['ingreso_total']
-                bottom_category = category_analysis.sort_values('rentabilidad').index[0]
-                bottom_rent = category_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']
-                
-                st.info(f"""
-                **💡 Insights:**
-                - Categoría con mayor ingreso: **{top_category}** (${top_income:,.0f})
-                - Categoría con menor rentabilidad: **{bottom_category}** (${bottom_rent:,.2f} por transacción)
-                """)
-        
-        # Pregunta 2: Segmentos de clientes
-        st.markdown("---")
-        st.markdown('<h3 class="sub-header">2️⃣ ¿Qué segmentos de clientes tienen el ticket promedio más alto?</h3>', unsafe_allow_html=True)
-        
-       
-        
-        segment_analysis = analyze_customer_segments(df)
-        
-        if segment_analysis:
-            tabs = st.tabs(list(segment_analysis.keys()))
-            
-            for i, (segment_type, analysis) in enumerate(segment_analysis.items()):
-                with tabs[i]:
-                    st.write(f"**Análisis por {segment_type}:**")
-                    st.dataframe(analysis, use_container_width=True)
-                    
-                    # Gráfico para el top 5
-                    if 'total_spent_mean' in analysis.columns:
-                        top_segments = analysis.head(5)
-                        x_col = analysis.index.name
-                        fig = create_simple_bar_chart(
-                            top_segments,
-                            x_col,
-                            'total_spent_mean',
-                            f'Top 5 {segment_type.title()} por Ticket Promedio',
-                            color_col=x_col
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-        
-        # Pregunta 3: Patrones temporales
-        st.markdown("---")
-        st.markdown('<h3 class="sub-header">3️⃣ ¿Existen patrones temporales en las ventas?</h3>', unsafe_allow_html=True)
-        
-        temporal_analysis = analyze_temporal_patterns(df)
-        
-        if temporal_analysis:
-            tabs = st.tabs(list(temporal_analysis.keys()))
-            
-            for i, (pattern_type, analysis) in enumerate(temporal_analysis.items()):
-                with tabs[i]:
-                    st.write(f"**Patrones por {pattern_type}:**")
-                    st.dataframe(analysis, use_container_width=True)
-                    
-                    # Gráfico
-                    if 'total_spent_sum' in analysis.columns:
-                        x_col = analysis.index.name
-
-                        fig = create_simple_bar_chart(
-                            analysis,
-                            x_col,
-                            'total_spent_sum',
-                            f'Ventas Totales por {pattern_type.replace("_", " ").title()}',
-                            color_col=x_col
-                        )   
-                        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
-
-
-# =====================================================
-# PÁGINA: VISUALIZACIONES
-# =====================================================
-def show_visualizations_page():
-    st.markdown('<h1 class="main-header">📊 Análisis Exploratorio (EDA)</h1>', unsafe_allow_html=True)
-
     if st.session_state.df_clean is None:
-        st.warning("⚠️ No hay datos procesados. Sube y limpia los datos primero.")
+        st.warning("⚠️ No hay datos procesados. Ve a Inicio y procesa un archivo.")
         return
 
     df = st.session_state.df_clean
 
-    # =========================
-    # TABS
-    # =========================
+    # ---------- Pregunta 1: Rentabilidad por categoría ----------
+    st.markdown('<h3 class="sub-header">1️⃣ ¿Qué categorías generan mayor ingreso y cuáles menor rentabilidad?</h3>', unsafe_allow_html=True)
+    cat_analysis = analyze_category_profitability(df)
+    if cat_analysis is not None:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Top 5 por Ingreso**")
+            top = cat_analysis.head(5).reset_index()
+            st.dataframe(top, use_container_width=True)
+            fig = create_simple_bar_chart(top, 'category', 'ingreso_total',
+                                          'Top 5 Categorías por Ingreso', color_col='category')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.write("**Bottom 5 por Rentabilidad**")
+            bottom = cat_analysis.sort_values('rentabilidad').head(5).reset_index()
+            st.dataframe(bottom, use_container_width=True)
+            fig = create_simple_bar_chart(bottom, 'category', 'rentabilidad',
+                                          'Bottom 5 Categorías por Rentabilidad', color_col='category')
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.info(f"""
+        **💡 Insights:**
+        - Mayor ingreso: **{cat_analysis.index[0]}** (${cat_analysis.iloc[0]['ingreso_total']:,.0f})
+        - Menor rentabilidad: **{cat_analysis.sort_values('rentabilidad').index[0]}** (${cat_analysis.sort_values('rentabilidad').iloc[0]['rentabilidad']:,.2f}/transacción)
+        """)
+
+    # ---------- Pregunta 2: Segmentos de clientes ----------
+    st.markdown("---")
+    st.markdown('<h3 class="sub-header">2️⃣ ¿Qué segmentos de clientes tienen el ticket promedio más alto?</h3>', unsafe_allow_html=True)
+    segment_data = analyze_customer_segments(df)
+    if segment_data:
+        tabs = st.tabs(list(segment_data.keys()))
+        for tab, (key, df_seg) in zip(tabs, segment_data.items()):
+            with tab:
+                st.write(f"**Análisis por {key.replace('_', ' ').title()}**")
+                st.dataframe(df_seg, use_container_width=True)
+                if not df_seg.empty:
+                    x_col = df_seg.columns[0]
+                    fig = create_simple_bar_chart(df_seg.head(5), x_col, 'ticket_promedio',
+                                                  f'Top 5 {key.title()} por Ticket Promedio',
+                                                  color_col=x_col)
+                    st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No hay suficientes datos para analizar segmentos.")
+
+    # ---------- Pregunta 3: Patrones temporales ----------
+    st.markdown("---")
+    st.markdown('<h3 class="sub-header">3️⃣ ¿Existen patrones temporales en las ventas?</h3>', unsafe_allow_html=True)
+    temporal = analyze_temporal_patterns(df)
+    if temporal:
+        tabs = st.tabs(list(temporal.keys()))
+        for tab, (key, df_temp) in zip(tabs, temporal.items()):
+            with tab:
+                st.write(f"**Patrón por {key.replace('_', ' ').title()}**")
+                st.dataframe(df_temp, use_container_width=True)
+                x_col = df_temp.columns[0]
+                fig = create_simple_bar_chart(df_temp, x_col, 'ventas_totales',
+                                              f'Ventas Totales por {x_col.title()}',
+                                              color_col=x_col)
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No hay datos temporales suficientes.")
+
+
+# =====================================================
+# PÁGINA: VISUALIZACIONES (EDA)
+# =====================================================
+def show_visualizations_page():
+    st.markdown('<h1 class="main-header">📊 Análisis Exploratorio (EDA)</h1>', unsafe_allow_html=True)
+    if st.session_state.df_clean is None:
+        st.warning("⚠️ No hay datos procesados.")
+        return
+
+    df = st.session_state.df_clean
     tab_uni, tab_bi, tab_temp, tab_report = st.tabs(
         ["📈 Univariado", "🔗 Bivariado", "📅 Temporal", "🧾 Reporte"]
     )
 
-    # =========================
-    # TAB 1 — UNIVARIADO
-    # =========================
     with tab_uni:
         st.subheader("Distribución de Variables Clave")
-
         col1, col2 = st.columns(2)
-
         with col1:
             if 'total_spent' in df.columns:
-                fig = px.histogram(
-                    df,
-                    x='total_spent',
-                    nbins=30,
-                    title='Distribución del Monto de Venta',
-                    labels={'total_spent': 'Monto de Venta'}
-                )
+                fig = px.histogram(df, x='total_spent', nbins=30, title='Distribución Monto de Venta')
                 st.plotly_chart(fig, use_container_width=True)
-
         with col2:
             if 'quantity' in df.columns:
-                fig = px.histogram(
-                    df,
-                    x='quantity',
-                    nbins=20,
-                    title='Distribución de Cantidades Vendidas',
-                    labels={'quantity': 'Cantidad'}
-                )
+                fig = px.histogram(df, x='quantity', nbins=20, title='Distribución Cantidad')
+                st.plotly_chart(fig, use_container_width=True)
+        if 'total_spent' in df.columns:
+            fig = create_box_plot(df, 'total_spent', 'Outliers en Montos')
+            if fig:
                 st.plotly_chart(fig, use_container_width=True)
 
-        if 'total_spent' in df.columns:
-            fig = create_box_plot(df, 'total_spent', 'Outliers en Montos de Venta')
-            st.plotly_chart(fig, use_container_width=True)
-
-    # =========================
-    # TAB 2 — BIVARIADO
-    # =========================
     with tab_bi:
         st.subheader("Relaciones y Comparaciones")
-
-        # -------------------------
-        # Categorías vs Ventas
-        # -------------------------
         if {'category', 'total_spent'}.issubset(df.columns):
-            category_sales = (
-                df.groupby('category')['total_spent']
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-                .reset_index()
-            )
-
-            fig = px.bar(
-                category_sales,
-                x='total_spent',
-                y='category',
-                orientation='h',
-                title='Top 10 Categorías por Ventas',
-                labels={'total_spent': 'Ventas Totales', 'category': 'Categoría'}
-            )
+            cat_sales = df.groupby('category')['total_spent'].sum().reset_index()
+            cat_sales = cat_sales.sort_values('total_spent', ascending=False).head(10)
+            fig = px.bar(cat_sales, x='total_spent', y='category', orientation='h',
+                         title='Top 10 Categorías por Ventas')
             st.plotly_chart(fig, use_container_width=True)
 
-        # -------------------------
-        # Ubicación vs Ventas
-        # -------------------------
         if {'location', 'total_spent'}.issubset(df.columns):
-            location_sales = (
-                df.groupby('location')['total_spent']
-                .sum()
-                .sort_values(ascending=False)
-                .reset_index()
-            )
-
-            fig = px.bar(
-                location_sales,
-                x='location',
-                y='total_spent',
-                title='Ventas por Ubicación',
-                labels={'location': 'Ubicación', 'total_spent': 'Ventas Totales'}
-            )
+            loc_sales = df.groupby('location')['total_spent'].sum().reset_index()
+            loc_sales = loc_sales.sort_values('total_spent', ascending=False)
+            fig = px.bar(loc_sales, x='location', y='total_spent', title='Ventas por Ubicación')
             st.plotly_chart(fig, use_container_width=True)
 
-        # -------------------------
-        # Scatter interactivo
-        # -------------------------
         numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
         if len(numeric_cols) >= 2:
             col1, col2 = st.columns(2)
             x_var = col1.selectbox("Variable X", numeric_cols)
             y_var = col2.selectbox("Variable Y", numeric_cols, index=1)
-
-            fig = px.scatter(
-                df,
-                x=x_var,
-                y=y_var,
-                trendline='ols',
-                title=f'Relación entre {x_var} y {y_var}'
-            )
+            fig = px.scatter(df, x=x_var, y=y_var, trendline='ols', title=f'{x_var} vs {y_var}')
             st.plotly_chart(fig, use_container_width=True)
 
-        # -------------------------
-        # Correlaciones
-        # -------------------------
-        heatmap = create_heatmap(df, 'Correlaciones entre Variables Numéricas')
-        if heatmap:
-            st.plotly_chart(heatmap, use_container_width=True)
+        heat = create_heatmap(df, 'Correlaciones')
+        if heat:
+            st.plotly_chart(heat, use_container_width=True)
 
-    # =========================
-    # TAB 3 — TEMPORAL
-    # =========================
     with tab_temp:
-        st.subheader("Patrones Temporales de Venta")
-
+        st.subheader("Patrones Temporales")
         if {'transaction_date', 'total_spent'}.issubset(df.columns):
-            df_temp = df.copy()
-            df_temp['date'] = df_temp['transaction_date'].dt.date
-
-            daily_sales = (
-                df_temp.groupby('date')['total_spent']
-                .sum()
-                .reset_index()
-            )
-
-            fig = px.line(
-                daily_sales,
-                x='date',
-                y='total_spent',
-                title='Evolución Diaria de Ventas',
-                labels={'date': 'Fecha', 'total_spent': 'Ventas Totales'}
-            )
+            df_d = df.copy()
+            df_d['date'] = df_d['transaction_date'].dt.date
+            daily = df_d.groupby('date')['total_spent'].sum().reset_index()
+            fig = px.line(daily, x='date', y='total_spent', title='Ventas Diarias')
             st.plotly_chart(fig, use_container_width=True)
 
-        if {'weekday', 'total_spent'}.issubset(df.columns):
-            weekday_sales = (
-                df.groupby('weekday')['total_spent']
-                .sum()
-                .reset_index()
-            )
-
-            order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            weekday_sales['weekday'] = pd.Categorical(
-                weekday_sales['weekday'],
-                categories=order,
-                ordered=True
-            )
-            weekday_sales = weekday_sales.sort_values('weekday')
-
-            fig = px.bar(
-                weekday_sales,
-                x='weekday',
-                y='total_spent',
-                title='Ventas por Día de la Semana',
-                labels={'weekday': 'Día', 'total_spent': 'Ventas Totales'}
-            )
+        if 'weekday' in df.columns and 'total_spent' in df.columns:
+            wd = df.groupby('weekday')['total_spent'].sum().reset_index()
+            orden = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            wd['weekday'] = pd.Categorical(wd['weekday'], categories=orden, ordered=True)
+            wd = wd.sort_values('weekday')
+            fig = px.bar(wd, x='weekday', y='total_spent', title='Ventas por Día de Semana')
             st.plotly_chart(fig, use_container_width=True)
 
-    # =========================
-    # TAB 4 — REPORTE
-    # =========================
     with tab_report:
         st.subheader("Resumen Ejecutivo")
-
         st.metric("Ventas Totales", f"${df['total_spent'].sum():,.0f}")
         st.metric("Ticket Promedio", f"${df['total_spent'].mean():,.2f}")
-        st.metric("Total Transacciones", len(df))
-
+        st.metric("Transacciones", len(df))
         with st.expander("Ver estadísticas descriptivas"):
             st.dataframe(df.describe())
-
         with st.expander("Descargar datos limpios"):
-            st.download_button(
-                "📥 Descargar CSV",
-                df.to_csv(index=False),
-                "datos_limpios.csv",
-                "text/csv"
-            )
-
+            st.download_button("📥 Descargar CSV", df.to_csv(index=False), "datos_limpios.csv", "text/csv")
 
 
 # =====================================================
@@ -1022,186 +570,129 @@ def show_visualizations_page():
 # =====================================================
 def show_kpis_page():
     st.markdown('<h1 class="main-header">📋 Panel de KPIs</h1>', unsafe_allow_html=True)
-    
-    if st.session_state.df_clean is not None:
-        df = st.session_state.df_clean
-        
-        # KPIs principales
-        st.markdown('<h3 class="sub-header">📊 KPIs Principales</h3>', unsafe_allow_html=True)
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if 'total_spent' in df.columns:
-                total_sales = df['total_spent'].sum()
-                st.metric("💰 Ventas Totales", f"${total_sales:,.0f}")
-        
-        with col2:
-            if 'total_spent' in df.columns:
-                avg_ticket = df['total_spent'].mean()
-                st.metric("🎫 Ticket Promedio", f"${avg_ticket:,.2f}")
-        
-        with col3:
-            transactions = len(df)
-            st.metric("🛒 Transacciones", f"{transactions:,}")
-        
-        with col4:
-            if 'quantity' in df.columns:
-                total_units = df['quantity'].sum()
-                st.metric("📦 Unidades Vendidas", f"{total_units:,}")
-        
-        # KPIs por categoría
+    if st.session_state.df_clean is None:
+        st.warning("⚠️ No hay datos procesados.")
+        return
+
+    df = st.session_state.df_clean
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if 'total_spent' in df.columns:
+            st.metric("💰 Ventas Totales", f"${df['total_spent'].sum():,.0f}")
+    with col2:
+        if 'total_spent' in df.columns:
+            st.metric("🎫 Ticket Promedio", f"${df['total_spent'].mean():,.2f}")
+    with col3:
+        st.metric("🛒 Transacciones", f"{len(df):,}")
+    with col4:
+        if 'quantity' in df.columns:
+            st.metric("📦 Unidades", f"{df['quantity'].sum():,.0f}")
+
+    if 'category' in df.columns:
         st.markdown("---")
         st.markdown('<h3 class="sub-header">🏷️ KPIs por Categoría</h3>', unsafe_allow_html=True)
-        
-        if 'category' in df.columns:
-            category_kpis = df.groupby('category').agg({
-                'total_spent': ['sum', 'mean', 'count']
-            }).round(2)
-            
-            if category_kpis.columns.nlevels > 1:
-                category_kpis.columns = ['_'.join(col).strip('_') for col in category_kpis.columns.values]
-            
-            st.dataframe(category_kpis, use_container_width=True)
-        
-        # KPIs temporales
+        kpi_cat = df.groupby('category').agg(
+            ventas=('total_spent', 'sum'),
+            ticket=('total_spent', 'mean'),
+            transacciones=('total_spent', 'count')
+        ).round(2).sort_values('ventas', ascending=False)
+        st.dataframe(kpi_cat, use_container_width=True)
+
+    if 'transaction_date' in df.columns:
         st.markdown("---")
         st.markdown('<h3 class="sub-header">📅 KPIs Temporales</h3>', unsafe_allow_html=True)
-        
-        if 'transaction_date' in df.columns:
-            # Últimos 30 días vs período anterior
-            df_temp = df.copy()
-            df_temp['date'] = df_temp['transaction_date'].dt.date
-            
-            if len(df_temp) > 0:
-                latest_date = df_temp['date'].max()
-                
-                last_30_days = latest_date - pd.Timedelta(days=30)
-                previous_30_days = last_30_days - pd.Timedelta(days=30)
-                
-                sales_last_30 = df_temp[df_temp['date'] >= last_30_days]['total_spent'].sum()
-                sales_previous_30 = df_temp[(df_temp['date'] >= previous_30_days) & 
-                                           (df_temp['date'] < last_30_days)]['total_spent'].sum()
-                
-                growth = ((sales_last_30 - sales_previous_30) / sales_previous_30 * 100) if sales_previous_30 > 0 else 0
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.metric("💰 Ventas últimos 30 días", f"${sales_last_30:,.0f}")
-                
-                with col2:
-                    st.metric("📈 Crecimiento vs período anterior", f"{growth:.1f}%")
-    else:
-        st.warning("⚠️ No hay datos procesados. Por favor, sube un archivo y procésalo en la página de Inicio.")
+        df_temp = df.copy()
+        df_temp['date'] = df_temp['transaction_date'].dt.date
+        if not df_temp.empty:
+            latest = df_temp['date'].max()
+            last30 = latest - pd.Timedelta(days=30)
+            prev30 = last30 - pd.Timedelta(days=30)
+            sales_last = df_temp[df_temp['date'] >= last30]['total_spent'].sum()
+            sales_prev = df_temp[(df_temp['date'] >= prev30) & (df_temp['date'] < last30)]['total_spent'].sum()
+            growth = ((sales_last - sales_prev) / sales_prev * 100) if sales_prev > 0 else 0
+            col1, col2 = st.columns(2)
+            col1.metric("💰 Ventas últimos 30 días", f"${sales_last:,.0f}")
+            col2.metric("📈 Crecimiento", f"{growth:.1f}%")
 
+
+# =====================================================
+# FUNCIONES DE IA (Groq)
+# =====================================================
 def generate_ai_insights(df):
-    """
-    Genera insights usando Groq LLM basado en estadísticas del dataset
-    """
-    api_key = st.session_state.get("groq_api_key", None)    
-    if api_key is None:
-        raise ValueError("No se encontró GROQ_API_KEY en st.session_state")
+    api_key = st.session_state.get("groq_api_key")
+    if not api_key:
+        raise ValueError("No hay API Key de Groq")
 
-    # Resumen estadístico
-    describe = df.describe().round(2).to_string()
-
-    # Tendencias simples
+    stats = df.describe().round(2).to_string()
     trends = []
     if 'total_spent' in df.columns:
         trends.append(f"Venta promedio: {df['total_spent'].mean():.2f}")
         trends.append(f"Venta máxima: {df['total_spent'].max():.2f}")
-
     if 'category' in df.columns:
-        top_category = df.groupby('category')['total_spent'].sum().idxmax()
-        trends.append(f"Categoría dominante: {top_category}")
-
-    trends_text = "\n".join(trends)
+        top_cat = df.groupby('category')['total_spent'].sum().idxmax()
+        trends.append(f"Categoría dominante: {top_cat}")
 
     prompt = f"""
-Eres un analista de datos senior especializado en retail.
+Eres analista de datos senior especializado en retail.
 
-Datos estadísticos:
-{describe}
+Estadísticas:
+{stats}
 
-Tendencias detectadas:
-{trends_text}
+Tendencias:
+{chr(10).join(trends)}
 
 Proporciona:
 1. 3 insights principales del negocio
 2. 2 riesgos potenciales
 3. 3 recomendaciones estratégicas accionables
-4. 1 pregunta estratégica para profundizar el análisis
+4. 1 pregunta estratégica para profundizar
 
-Responde en español, de forma clara, ejecutiva y estructurada.
+Responde en español, tono ejecutivo, con bullet points.
 """
-
     url = "https://api.groq.com/openai/v1/chat/completions"
-
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "mixtral-8x7b-32768",  # modelo estable y rápido
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3
     }
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
-
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
     if response.status_code != 200:
-        raise RuntimeError(f"Error Groq API: {response.text}")
-
+        raise RuntimeError(f"Error API: {response.text}")
     return response.json()["choices"][0]["message"]["content"]
 
 
 def show_ai_insights_page():
     st.markdown('<h1 class="main-header">🤖 Insights Generados con IA</h1>', unsafe_allow_html=True)
-
     if st.session_state.df_clean is None:
         st.warning("⚠️ Primero debes cargar y limpiar los datos.")
         return
+    if not st.session_state.groq_api_key:
+        st.error("🔑 Ingresa tu API Key de Groq en la barra lateral.")
+        return
 
     df = st.session_state.df_clean
-
-    st.markdown("""
-    Esta sección utiliza **IA Generativa (Groq + LLaMA 3)** para interpretar
-    automáticamente los resultados del EDA y generar recomendaciones de negocio.
-    """)
-
-    with st.expander("⚙️ Configuración de IA", expanded=True):
-        st.write("La clave API se obtiene desde `st.session_state` (no hardcodeada).")
-        st.write("Modelo: **llama-3.3-70b-versatile**")
+    st.markdown("Esta sección usa **Groq + Mixtral** para generar insights automáticos.")
+    with st.expander("⚙️ Configuración"):
+        st.write("Modelo: **mixtral-8x7b-32768** (estable)")
 
     if st.button("🚀 Generar Insights con IA", type="primary"):
-        with st.spinner("Analizando datos y generando insights..."):
+        with st.spinner("Analizando datos y consultando IA..."):
             try:
                 insights = generate_ai_insights(df)
-
-                st.success("✅ Insights generados correctamente")
-
+                st.success("✅ Insights generados")
                 st.markdown("### 🧠 Análisis Ejecutivo")
                 st.markdown(insights)
-
-                # Guardar en sesión
                 st.session_state.ai_insights = insights
-
             except Exception as e:
-                st.error(f"Error generando insights: {str(e)}")
+                st.error(f"Error: {str(e)}")
 
-    # Exportar insights
-    if "ai_insights" in st.session_state:
+    if "ai_insights" in st.session_state and st.session_state.ai_insights:
         st.markdown("---")
         st.subheader("📥 Exportar Insights")
+        st.download_button("Descargar TXT", st.session_state.ai_insights,
+                           "insights_ia.txt", "text/plain")
 
-        st.download_button(
-            "Descargar Insights (TXT)",
-            st.session_state.ai_insights,
-            "insights_ia.txt",
-            "text/plain"
-        )
 
 # =====================================================
 # EJECUCIÓN PRINCIPAL
