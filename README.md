@@ -1,3 +1,6 @@
+
+# 0 link del proyecto en streamlit  : https://proyectofinal-3geswd8ggswv3fsu4ekagz.streamlit.app/
+
 ```markdown
 # Dashboard Retail Inteligente
 
@@ -131,5 +134,6 @@ Gracias por compartir conocimiento y contribuir al crecimiento de la comunidad. 
 Periodo 2026-1
 
 ---
+
 
 
