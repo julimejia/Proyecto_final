@@ -379,6 +379,8 @@ def main():
         st.markdown("---")
         st.subheader("📂 Carga de Datos")
         uploaded_file = st.file_uploader("Sube tu archivo CSV", type=['csv'])
+
+        
         
         if uploaded_file:
             df = load_file(uploaded_file)
@@ -397,6 +399,22 @@ def main():
                         st.success("✅ Datos procesados")
         else:
             st.info("👆 Sube un archivo CSV para comenzar")
+
+        st.markdown("---")
+        st.subheader("🤖 Configuración IA")
+
+        api_key_input = st.text_input(
+            "Groq API Key",
+            type="password",
+            help="Introduce tu API Key de Groq. No se almacenará permanentemente."
+        )
+
+        if api_key_input:
+            st.session_state.groq_api_key = api_key_input
+            st.success("API Key cargada correctamente ✅")
+        else:
+            if "groq_api_key" not in st.session_state:
+                st.session_state.groq_api_key = None
     
     # Páginas principales
     if page == "🏠 Inicio":
