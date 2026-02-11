@@ -8,6 +8,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import warnings
+import requests
+import json
+
 warnings.filterwarnings('ignore')
 
 # Configuración de página
