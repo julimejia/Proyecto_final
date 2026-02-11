@@ -289,7 +289,7 @@ def analyze_temporal_patterns(df):
 # VISUALIZACIONES SIMPLES Y CLARAS
 # =====================================================
 def create_simple_bar_chart(df, x_col, y_col, title, color_col=None):
-    plot_data = df.reset_index()  # 🔑 convierte índice en columna real
+    plot_data = df.reset_index() 
 
     fig = px.bar(
         plot_data,
@@ -391,7 +391,7 @@ def main():
                 st.success(f"✅ {uploaded_file.name}")
                 st.info(f"📊 {len(df)} registros, {len(df.columns)} columnas")
                 
-                # Procesar datos
+
                 if st.button("🔄 Procesar Datos", type="primary"):
                     with st.spinner("Limpiando y procesando datos..."):
                         df_clean, df_original, transformations = clean_retail_data(df)
@@ -419,7 +419,7 @@ def main():
             if "groq_api_key" not in st.session_state:
                 st.session_state.groq_api_key = None
     
-    # Páginas principales
+
     if page == "🏠 Inicio":
         show_home_page()
     elif page == "🔄 Limpieza":
@@ -430,6 +430,8 @@ def main():
         show_visualizations_page()
     elif page == "📋 KPIs":
         show_kpis_page()
+    elif page == "🤖 Insights IA": 
+        show_ai_insights_page()
 
 
 # =====================================================
